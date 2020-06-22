@@ -17,7 +17,6 @@ DIY Smart Home IoT Solution with Tensorflow Lite and OpenCV
 [![LinkedIn][linkedin-shield]][linkedin-url]
 
 
-
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
@@ -25,19 +24,19 @@ DIY Smart Home IoT Solution with Tensorflow Lite and OpenCV
     <img src="images/logo.png" alt="Logo" width="80" height="80">
   </a>
 
-  <h3 align="center">Best-README-Template</h3>
+  <h3 align="center">IoT Home</h3>
 
   <p align="center">
-    An awesome README template to jumpstart your projects!
+  DIY Smart Home IoT Solution with Tensorflow Lite and OpenCV
     <br />
-    <a href="https://github.com/othneildrew/Best-README-Template"><strong>Explore the docs »</strong></a>
+    <a href="https://github.com/jjhickman/iot-home/docs"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/othneildrew/Best-README-Template">View Demo</a>
+    <a href="https://jjhickman.com/iot-home">View Demo</a>
     ·
-    <a href="https://github.com/othneildrew/Best-README-Template/issues">Report Bug</a>
+    <a href="https://github.com/jjhickman/iot-home/issues">Report Bug</a>
     ·
-    <a href="https://github.com/othneildrew/Best-README-Template/issues">Request Feature</a>
+    <a href="https://github.com/jjhickman/iot-home/issues">Request Feature</a>
   </p>
 </p>
 
@@ -97,11 +96,11 @@ This system consists of multiple software components and devices. As such the re
 * [Node.js](https://nodejs.org/en/)
 * [Amazon Web Services - S3](https://aws.amazon.com/s3/)
 
-### Motion Detection Security Camera
+#### Motion Detection Security Camera
 * [Python](https://www.python.org/)
 * [Amazon Web Services - SNS](https://aws.amazon.com/sns/)
 
-### Voice Assistant
+#### Voice Assistant
 * [Python](https://www.python.org/)
 
 <!-- GETTING STARTED -->
