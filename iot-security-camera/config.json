@@ -1,5 +1,6 @@
 {
     "sns_topic_arn": "",
+    "aws_region": "",
     "secret_access_key": "",
     "access_key_id": "",
     "iot_hub_hostname": "",

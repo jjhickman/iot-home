@@ -36,7 +36,7 @@ def run(config):
         try:
             watch_thread.start()
             stream_thread.start()
-            s3 = boto3.client('s3', region_name='us-east-1',aws_access_key_id=configuration['access_key_id'], aws_secret_access_key=configuration['secret_access_key'])
+            s3 = boto3.client('s3', region_name=config['aws_region'],aws_access_key_id=config['access_key_id'], aws_secret_access_key=config['secret_access_key'])
             device = socket.gethostname()
             while True:
                 if not q.empty():
