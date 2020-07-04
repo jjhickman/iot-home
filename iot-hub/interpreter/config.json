@@ -1,0 +1,14 @@
+{
+	"model_directory": "/mnt/t5/all_models",
+        "model": "mobilenet_ssd_v2_face_quant_postprocess_edgetpu.tflite",
+        "labels": "imagenet_labels.txt",
+        "top_k":10,
+	"log_directory": "/mnt/t5/log",
+        "camera_id": 0,
+        "score_threshold": 0.4,
+        "clip_duration_sec": 30,
+        "video_directory": "/mnt/t5/log",
+        "camera_stream_url": "http://blackberry:8000/stream.mjpg",
+	"websocket_url": "localhost",
+	"websocket_port": 4000
+}
