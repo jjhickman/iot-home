@@ -3,8 +3,10 @@ import threading
 import datetime 
 import time
 import json
+import socket
 import logging
 import boto3
+import http.client
 import picamera
 import detector
 import streamer
@@ -35,12 +37,19 @@ def run(config):
             watch_thread.start()
             stream_thread.start()
             s3 = boto3.client('s3', region_name='us-east-1',aws_access_key_id=configuration['access_key_id'], aws_secret_access_key=configuration['secret_access_key'])
+            device = socket.gethostname()
             while True:
                 if not q.empty():
                     name = q.get()
-                    pathname = config['log_directory'] + '/' + name
-                    camera.capture(pathname, use_video_port=True)
-                    s3.upload_file(Bucket = configuration['s3_bucket_name'], Filename=pathname, Key=name)
+                    connection = http.client.HTTPSConnection(config['iot_hub_hostname'])
+                    headers = {'Content-type': 'application/json'}
+                    notification = {'device': device, 'event': 'motion', 'stream_url': device + ':8000'}
+                    connection.request('POST', '/security/camera/' + device, json.dumps(notification), headers)
+                    response = connection.getresponse()
+                    if response.status != 200:
+                        pathname = config['log_directory'] + '/' + name
+                        camera.capture(pathname, use_video_port=True)
+                        s3.upload_file(Bucket = configuration['s3_bucket_name'], Filename=pathname, Key=name)
                     q.task_done()
                     time.sleep(0.2)
         finally:
