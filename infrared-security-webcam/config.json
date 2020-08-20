@@ -1,0 +1,10 @@
+{
+    "width": 300,
+    "height": 300,
+    "fps": 24,
+    "server_port": 3000,
+    "stream_port": 8080,
+    "gpio_pin": 16,
+    "cooldown_ms": 60000,
+    "iot_hub": "master"
+}
