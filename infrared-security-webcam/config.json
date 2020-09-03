@@ -1,10 +1,10 @@
 {
-    "width": 300,
-    "height": 300,
-    "fps": 24,
-    "server_port": 3000,
-    "stream_port": 8080,
-    "gpio_pin": 16,
-    "cooldown_ms": 60000,
-    "iot_hub": "master"
+    "cooldown_seconds": 60,
+    "fps": 20,
+    "port": 3000,
+    "hub_wait_seconds": 5,
+    "hub_url": "http://192.168.50.110:8881",
+    "pigpiod_host": "localhost",
+    "pigpiod_port": 8882,
+    "infrared_gpio": 16
 }
