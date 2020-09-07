@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+iot-hub/rest-api/build
+iot-hub/rest-api/node_modules
