@@ -3,14 +3,15 @@ FROM balenalib/raspberry-pi-python:latest
 WORKDIR /iot-home
 
 ARG OPENCV_VERSION=4.4.0
-ARG CPU_CORES=1
+ARG CPU_CORES=4
 ARG REPOSITORY=https://github.com/jjhickman/iot-home.git
 ENV OPENCV_VERSION=$OPENCV_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
 
+# Install build dependencies
 RUN set -e; \
     apt-get update && apt-get install -y --no-install-recommends \
-    build-essential apt-utils cmake wget gfortran zip unzip libjpeg-dev libtiff-dev libgif-dev \
+    build-essential apt-utils cmake wget git gfortran zip unzip libjpeg-dev libtiff-dev libgif-dev \
     libavcodec-dev libavformat-dev libswscale-dev \
     libgtk2.0-dev libcanberra-gtk* \
     libxvidcore-dev libx264-dev libgtk-3-dev \
@@ -47,7 +48,7 @@ RUN set -e; \
     mv opencv-${OPENCV_VERSION} opencv; \
     mv opencv_contrib-${OPENCV_VERSION} opencv_contrib
 
-# Build and install OpenCV
+# Configure OpenCV
 RUN set -e; \
     cd /tmp/opencv; \
     mkdir build; \
@@ -72,11 +73,19 @@ RUN set -e; \
         -D BUILD_DOCS=OFF \
         -D BUILD_PERF_TESTS=OFF \
         -D BUILD_TESTS=OFF \
-        ..; \
-    make -j$CPU_CORES; \
+        .. 
+
+# Build OpenCV
+RUN set -e; \
+    cd /tmp/opencv/build; \
+    make -j$CPU_CORES 
+
+# Install OpenCV
+RUN set -e; \
+    cd /tmp/opencv/build; \ 
     make install; \
     ldconfig; \
-    make clean; \
+    make clean
 
 # Clean up installation
 RUN set -e; \
@@ -84,7 +93,7 @@ RUN set -e; \
 
 # Get application and dependencies
 RUN git clone $REPOSITORY .
-RUN cd ./infrared-security-webcam; \
-    pip3 install -r requirements.txt
+#RUN cd ./infrared-security-webcam; \
+#    pip3 install -r requirements.txt
 
 CMD ["/bin/bash"]
