@@ -1,53 +1,43 @@
-FROM arm32v6/python:3.7-alpine3.11
+FROM balenalib/raspberry-pi-python:latest
 
-ARG PYTHON_VERSION_SHORT=3.7
+WORKDIR /iot-home
+
 ARG OPENCV_VERSION=4.4.0
 ARG CPU_CORES=1
 ARG REPOSITORY=https://github.com/jjhickman/iot-home.git
 ENV OPENCV_VERSION=$OPENCV_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
 
-
-WORKDIR /iot-home
-RUN apk update
-RUN apk add build-base \
-    clang \
-    clang-dev ninja \
-    cmake \
-    freetype-dev \
-    g++ \
-    jpeg-dev \
-    lcms2-dev \
-    libffi-dev \
-    libgcc \
-    libxml2-dev \
-    libxslt-dev \
-    linux-headers \
-    make \
-    musl \
-    musl-dev \
-    openjpeg-dev \
-    openssl-dev \
-    python3-dev \
-    zlib-dev \
-    && apk add \
-    curl \
-    freetype \
-    gcc \
-    jpeg \
-    libjpeg \
-    openjpeg \
-    python3 \
-    tesseract-ocr \
-    zlib
+RUN set -e; \
+    apt-get update && apt-get install -y --no-install-recommends \
+    build-essential apt-utils cmake wget gfortran zip unzip libjpeg-dev libtiff-dev libgif-dev \
+    libavcodec-dev libavformat-dev libswscale-dev \
+    libgtk2.0-dev libcanberra-gtk* \
+    libxvidcore-dev libx264-dev libgtk-3-dev \
+    libtbb2 libtbb-dev libdc1394-22-dev libv4l-dev \
+    libopenblas-dev libatlas-base-dev libblas-dev \
+    libjasper-dev liblapack-dev libhdf5-dev \
+    gcc-arm* protobuf-compiler
 
 # Installing build tools and dependencies.
-RUN apk del build-dependencies && \
-    rm -rf /var/cache/apk/*
+RUN rm -rf /var/lib/apt/lists/* \
+	&& apt-get -y autoremove
 
+
+# Install Node.js build for ARMv6l
+RUN set -e; \
+    cd /tmp; \
+    wget https://nodejs.org/dist/v11.15.0/node-v11.15.0-linux-armv6l.tar.gz; \
+    tar -xzf node-v11.15.0-linux-armv6l.tar.gz; \
+    cp -R node-v11.15.0-linux-armv6l/* /usr/local/
+
+# install PM2 to run daemon app
+RUN npm install -g pm2
+
+# Install NumPy dependency for OpenCV
 RUN pip install numpy
 
-# Download latest source and contrib
+# Download OpenCV and module source
 RUN set -e; \
     cd /tmp; \
     wget -c -nv -O opencv.zip https://github.com/opencv/opencv/archive/$OPENCV_VERSION.zip; \
@@ -57,7 +47,7 @@ RUN set -e; \
     mv opencv-${OPENCV_VERSION} opencv; \
     mv opencv_contrib-${OPENCV_VERSION} opencv_contrib
 
-# Build opencv
+# Build and install OpenCV
 RUN set -e; \
     cd /tmp/opencv; \
     mkdir build; \
@@ -69,19 +59,8 @@ RUN set -e; \
         -D WITH_QT=OFF \
         -D WITH_GTK=OFF \
         # Build without GPU support
-        -D WITH_OPENCL=OFF \
+        -D WITH_OPENCL=ON \
         -D WITH_CUDA=OFF \
-        -D BUILD_opencv_gpu=OFF \
-        -D BUILD_opencv_gpuarithm=OFF \
-        -D BUILD_opencv_gpubgsegm=OFF \
-        -D BUILD_opencv_gpucodec=OFF \
-        -D BUILD_opencv_gpufeatures2d=OFF \
-        -D BUILD_opencv_gpufilters=OFF \
-        -D BUILD_opencv_gpuimgproc=OFF \
-        -D BUILD_opencv_gpulegacy=OFF \
-        -D BUILD_opencv_gpuoptflow=OFF \
-        -D BUILD_opencv_gpustereo=OFF \
-        -D BUILD_opencv_gpuwarping=OFF \
         # Build with python
         -D BUILD_opencv_python3=ON \
         -D BUILD_opencv_python2=OFF \
@@ -97,15 +76,15 @@ RUN set -e; \
     make -j$CPU_CORES; \
     make install; \
     ldconfig; \
-    # Clean up
     make clean; \
-    cd /tmp; \
+
+# Clean up installation
+RUN set -e; \
     rm -rf /tmp/*
 
-# get application
+# Get application and dependencies
 RUN git clone $REPOSITORY .
 RUN cd ./infrared-security-webcam; \
     pip3 install -r requirements.txt
-
 
 CMD ["/bin/bash"]
