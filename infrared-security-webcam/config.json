@@ -4,7 +4,5 @@
     "port": 3000,
     "hub_wait_seconds": 5,
     "hub_url": "http://192.168.50.110:8881",
-    "pigpiod_host": "localhost",
-    "pigpiod_port": 8882,
-    "infrared_gpio": 16
+    "infrared_gpio": 23
 }
