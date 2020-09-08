@@ -1,1 +1,1 @@
-docker run --env LD_LIBRARY_PATH=/opt/vc/lib --device /dev/gpiomem --device /dev/vchiq -v /opt/vc:/opt/vc -t webcamv0
+docker run --privileged --env LD_LIBRARY_PATH=/opt/vc/lib --device /dev/gpiomem --device /dev/vchiq -v /opt/vc:/opt/vc -t webcamv0
