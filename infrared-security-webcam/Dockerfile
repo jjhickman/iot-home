@@ -1,4 +1,4 @@
-FROM arm32v6/python:3.7-alpine:3.11
+FROM arm32v6/python:3.7-alpine3.11
 
 ARG PYTHON_VERSION_SHORT=3.7
 ARG OPENCV_VERSION=4.4.0
@@ -7,44 +7,43 @@ ARG REPOSITORY=https://github.com/jjhickman/iot-home.git
 ENV OPENCV_VERSION=$OPENCV_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
 
+
 WORKDIR /iot-home
+RUN apk update
+RUN apk add build-base \
+    clang \
+    clang-dev ninja \
+    cmake \
+    freetype-dev \
+    g++ \
+    jpeg-dev \
+    lcms2-dev \
+    libffi-dev \
+    libgcc \
+    libxml2-dev \
+    libxslt-dev \
+    linux-headers \
+    make \
+    musl \
+    musl-dev \
+    openjpeg-dev \
+    openssl-dev \
+    python3-dev \
+    zlib-dev \
+    && apk add \
+    curl \
+    freetype \
+    gcc \
+    jpeg \
+    libjpeg \
+    openjpeg \
+    python3 \
+    tesseract-ocr \
+    zlib
 
 # Installing build tools and dependencies.
-RUN set -e; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
-        apt-utils \
-        build-essential; \
-    apt-get install -y --no-install-recommends \
-        # Downloading utils
-        unzip \
-        wget \
-        # Build utils
-        cmake \
-        gcc \
-        # Required dependencies
-        python-numpy \
-        libavcodec-dev \
-        libavformat-dev \
-        libswscale-dev \
-        libgstreamer-plugins-base1.0-dev \
-        # Optional dependencies
-        libtbb2 \
-        libtbb-dev \
-        libjpeg-dev \
-        libpng-dev \
-        libopenexr-dev \
-        libtiff-dev \
-        libwebp-dev \
-        # Video device drivers
-        libv4l-dev \
-        libdc1394-22-dev \
-        # app-specific dependencies
-        python3-pip \
-        python3-dev \
-        python3-rpi.gpio; \
-    # Clear apt cache
-    rm -rf /var/lib/apt/lists/*
+RUN apk del build-dependencies && \
+    rm -rf /var/cache/apk/*
 
 RUN pip install numpy
 
