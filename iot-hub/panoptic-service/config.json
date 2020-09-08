@@ -1,5 +1,6 @@
 {
-    "input_queue": "",
-    "output_queue": "",
-    "rabbitmq_host": "localhost"
+    "model_directory": "models",
+    "rabbitmq_host": "localhost",
+    "input_interpreter_queue": "input_interpreter_queue",
+    "output_interpreter_queue": "output_interpreter_queue"
 }
