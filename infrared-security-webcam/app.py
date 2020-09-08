@@ -11,6 +11,7 @@ import logging
 import pathlib
 import RPi.GPIO as GPIO
 import json
+import aiohttp
 from aiohttp import web
 from middleware import setup_middlewares
 logger = logging.getLogger('aiohttp.server')
@@ -108,6 +109,23 @@ async def stream(app):
     except asyncio.CancelledError:
         logger.debug('Stream cancelled')
 
+"""
+=============================================================================
+    SocketIO handles
+=============================================================================
+"""
+@sio.on('finished')
+async def handle_finish(sid, data):
+    print('Client {} finished job. Disconnecting...'.format(sid))
+    await sio.disconnect(sid)
+
+@sio.event
+async def connect(sid, environ):
+    print('CONNECTED to client with id: {}'.format(sid))
+
+@sio.event
+def disconnect(sid):
+    print('DISCONNECTED from client with id: {}'.format(sid))
 
 
 """

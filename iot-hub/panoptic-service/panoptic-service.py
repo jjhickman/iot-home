@@ -53,17 +53,13 @@ def get_output(interpreter, score_threshold, top_k, image_scale=1.0):
 
     return [make(i) for i in range(top_k) if scores[i] >= score_threshold]
 
-def load_interpreter(model):
-    interpret = common.make_interpreter(model)
-    interpret.allocate_tensors()
-    return interpret
-
 def load_job(config, job):
     try:
         data = json.loads(job)
         source = data['source']
         job_type = data['job_type']
-        job_interpreter = load_interpreter(config['model_directory'] + '/' + JOBS[job_type]['model'])
+        job_interpreter = common.make_interpreter(config['model_directory'] + '/' + JOBS[job_type]['model'])
+        job_interpreter.allocate_tensors()
         print('Loading job of type: {} with model {} using source {}'.format(job_type, JOBS[job_type]['model'], source))
         return job_type, job_interpreter, source
     except ValueError:
