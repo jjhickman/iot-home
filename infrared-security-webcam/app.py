@@ -54,7 +54,7 @@ async def sleep(request):
         awake_time = time.time() + sleep_seconds
         update = 'Sleeping for {} seconds, waking at {}'.format(sleep_seconds, time.ctime(awake_time))
         logger.info(update)
-        return web.Response(text=update)
+        return await web.Response(text=update)
     return web.Response(status=404, text='Invalid number of seconds in request: {}'.format(sleep_seconds))
 
 
@@ -67,13 +67,14 @@ async def notify_hub(app, session):
     global stream_url
     with async_timeout.timeout(app['config']['hub_wait_seconds']):
         async with session.post(app['config']['hub_url'], data=stream_url) as response:
-            return await response.status, response.text() 
+            print('Notifying {}'.format(app['config']['hub_url']))
+            return await response.status, response.text()
 
-async def on_motion():
+async def on_motion(app):
     global awake_time, cooldown_time
     epoch_time = time.time()
     if epoch_time > cooldown_time and epoch_time > awake_time:
-        logger.info('Motion detected!')
+        logger.info('Notifying hub at {}'.format(app['config'][]))
         cooldown_time = epoch_time + int(app['config']['cooldown_seconds'])
         async with aiohttp.ClientSession() as session:
             status, response = await notify_hub(app, session)
@@ -107,12 +108,13 @@ async def stream(app):
         logger.debug('Stream cancelled')
 
 
-async def monitor(pin):
+async def monitor(app):
+    pin = app['gpio_pin']
     while True:
         await asyncio.sleep(0.01)
         if GPIO.input(pin) > 0:
             print('Movement detected!')
-            await on_motion()
+            await on_motion(app)
 
 """
 =============================================================================
@@ -166,7 +168,7 @@ def initialize():
 async def start_tasks(app):
     app['capture'] = cv2.VideoCapture(0)
     app['stream'] = app.loop.create_task(stream(app))
-    app['gpio'] = app.loop.create_task(monitor(app['gpio_pin']))
+    app['gpio'] = app.loop.create_task(monitor(app))
 
 async def cleanup_tasks(app):
     app['capture'].release()

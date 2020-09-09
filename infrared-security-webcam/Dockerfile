@@ -92,9 +92,9 @@ RUN set -e; \
     rm -rf /tmp/*
 
 # Get application and dependencies
-RUN git clone $REPOSITORY .
-RUN cd /infrared-security-webcam; \
-    pip install -r requirements.txt
+#RUN git clone $REPOSITORY .
+#RUN cd /infrared-security-webcam; \
+#    pip install -r requirements.txt
 
 CMD ["/bin/bash"]
 # CMD ["pm2", "start", "infrared-security-webcam/app.py", "--interpreter", "python3.8", "--name", "infrared-security-webcam", "--restart-delay", "5000"]
