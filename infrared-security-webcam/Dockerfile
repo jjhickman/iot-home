@@ -18,7 +18,7 @@ RUN set -e; \
     libtbb2 libtbb-dev libdc1394-22-dev libv4l-dev \
     libopenblas-dev libatlas-base-dev libblas-dev \
     libjasper-dev liblapack-dev libhdf5-dev \
-    gcc-arm* protobuf-compiler
+    gcc-arm* protobuf-compiler vim
 
 # Installing build tools and dependencies.
 RUN rm -rf /var/lib/apt/lists/* \
@@ -93,7 +93,8 @@ RUN set -e; \
 
 # Get application and dependencies
 RUN git clone $REPOSITORY .
-#RUN cd ./infrared-security-webcam; \
-#    pip3 install -r requirements.txt
+RUN cd /infrared-security-webcam; \
+    pip install -r requirements.txt
 
 CMD ["/bin/bash"]
+# CMD ["pm2", "start", "infrared-security-webcam/app.py", "--interpreter", "python3.8", "--name", "infrared-security-webcam", "--restart-delay", "5000"]

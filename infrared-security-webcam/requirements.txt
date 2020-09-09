@@ -1,3 +1,4 @@
+RPi.GPIO
 python-socketio
 asyncio
 async-timeout

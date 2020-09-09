@@ -19,7 +19,7 @@ logger = logging.getLogger('aiohttp.server')
 awake_time = -1
 cooldown_time = -1
 stream_url = ''
-sio = None
+sio = socketio.AsyncServer()
 
 """
 =============================================================================
@@ -63,14 +63,13 @@ async def sleep(request):
     Motion detection via infrared GPIO and notification for hub
 =============================================================================
 """
-# Make 
 async def notify_hub(app, session):
     global stream_url
     with async_timeout.timeout(app['config']['hub_wait_seconds']):
         async with session.post(app['config']['hub_url'], data=stream_url) as response:
             return await response.status, response.text() 
 
-async def on_motion(pin):
+async def on_motion():
     global awake_time, cooldown_time
     epoch_time = time.time()
     if epoch_time > cooldown_time and epoch_time > awake_time:
@@ -85,17 +84,15 @@ async def on_motion(pin):
 
 """
 =============================================================================
-    SocketIO camera capture async loop for web stream
+    SocketIO camera capture async loop for web stream and for GPIO input
 =============================================================================
 """
 async def stream(app):
-    global sio
     refresh_ms = 1.0 / int(app['config']['fps'])
     logger.debug('Updating stream every {} ms'.format(refresh_ms))
     try:
         while True:
             ret, frame = app['capture'].read()
-            
             if ret == False:
                 print("FAILED READING FROM CAPTURE")
                 break
@@ -103,11 +100,19 @@ async def stream(app):
             base64_image = base64.b64encode(jpg_image)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-            await sio.emit('image', base64_image)
+            await app['socket'].emit('image', base64_image)
             await asyncio.sleep(refresh_ms)
         logger.debug('Ended stream!')
     except asyncio.CancelledError:
         logger.debug('Stream cancelled')
+
+
+async def monitor(pin):
+    while True:
+        await asyncio.sleep(0.01)
+        if GPIO.input(pin) > 0:
+            print('Movement detected!')
+            await on_motion()
 
 """
 =============================================================================
@@ -144,14 +149,12 @@ def initialize():
     wifi_address =  ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
     stream_url = 'http://{}:{}'.format(wifi_address, app['config']['port'])
 
-    sio = socketio.AsyncServer(logger=logger)
     sio.attach(app)
+    app['socket'] = sio
 
-    # app['gpio'] = gpio
-    #app['gpio_callback'] = app['gpio'].callback(app['config']['infrared_gpio'], pigpio.RISING_EDGE, on_motion)
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(int(app['config']['infrared_gpio']), GPIO.IN)
-    GPIO.add_event_detect(int(app['config']['infrared_gpio']), GPIO.RISING, callback=on_motion)
+    app['gpio_pin'] = int(app['config']['infrared_gpio'])
 
     app.router.add_get('/', index)
     app.router.add_post('/sleep/{sleep_seconds}', sleep)
@@ -163,6 +166,7 @@ def initialize():
 async def start_tasks(app):
     app['capture'] = cv2.VideoCapture(0)
     app['stream'] = app.loop.create_task(stream(app))
+    app['gpio'] = app.loop.create_task(monitor(app['gpio_pin']))
 
 async def cleanup_tasks(app):
     app['capture'].release()
