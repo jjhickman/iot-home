@@ -74,7 +74,7 @@ async def on_motion(app):
     global awake_time, cooldown_time
     epoch_time = time.time()
     if epoch_time > cooldown_time and epoch_time > awake_time:
-        logger.info('Notifying hub at {}'.format(app['config'][]))
+        logger.info('Notifying hub at {}'.format(app['config']['hub_url']))
         cooldown_time = epoch_time + int(app['config']['cooldown_seconds'])
         async with aiohttp.ClientSession() as session:
             status, response = await notify_hub(app, session)
