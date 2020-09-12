@@ -1,4 +1,4 @@
-FROM balenalib/raspberry-pi-python:latest
+FROM raspbian/stretch:latest
 
 WORKDIR /iot-home
 
@@ -11,14 +11,11 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Install build dependencies
 RUN set -e; \
     apt-get update && apt-get install -y --no-install-recommends \
-    build-essential apt-utils cmake wget git gfortran zip unzip libjpeg-dev libtiff-dev libgif-dev \
+    build-essential apt-utils cmake wget git pkg-config gfortran zip unzip libjpeg-dev libtiff5-dev \
     libavcodec-dev libavformat-dev libswscale-dev \
-    libgtk2.0-dev libcanberra-gtk* \
-    libxvidcore-dev libx264-dev libgtk-3-dev \
-    libtbb2 libtbb-dev libdc1394-22-dev libv4l-dev \
-    libopenblas-dev libatlas-base-dev libblas-dev \
-    libjasper-dev liblapack-dev libhdf5-dev \
-    gcc-arm* protobuf-compiler vim
+    libgtk2.0-dev libxvidcore-dev libx264-dev \
+    libv4l-dev libatlas-base-dev libjasper-dev \
+    vim python3-dev python2.7-dev
 
 # Installing build tools and dependencies.
 RUN rm -rf /var/lib/apt/lists/* \
@@ -35,8 +32,10 @@ RUN set -e; \
 # install PM2 to run daemon app
 RUN npm install -g pm2
 
+RUN apt-get update && apt-get install python3-pip python3-dev -y --no-install-recommends
+
 # Install NumPy dependency for OpenCV
-RUN pip install numpy
+RUN pip3 install --upgrade pip && pip3 install numpy
 
 # Download OpenCV and module source
 RUN set -e; \
@@ -62,30 +61,31 @@ RUN set -e; \
         # Build without GPU support
         -D WITH_OPENCL=ON \
         -D WITH_CUDA=OFF \
+	-D WITH_VTK=OFF \
+	-D WITH_QT=OFF \
+	-D OPENCV_GENERATE_PKGCONFIG=ON \
+	-D BUILD_NEW_PYTHON_SUPPORT=ON \
+	-D BUILD_opencv_python3=TRUE \
+	-D WITH_OPENMP=ON \
+	-D BUILD_TIFF=ON \
+	-D WITH_FFMPEG=ON \
+	-D WITH_GSTREAMER=ON \
+	-D WITH_TBB=ON \
+	-D BUILD_TBB=ON \
+	-D OPENCV_EXTRA_EXE_LINKER_FLAGS=-latomic \
+	-D WITH_EIGEN=OFF \
         # Build with python
-        -D BUILD_opencv_python3=ON \
-        -D BUILD_opencv_python2=OFF \
         # Ignore all unnecessary stages
-        -D BUILD_opencv_apps=OFF \
         -D BUILD_EXAMPLES=OFF \
         -D INSTALL_C_EXAMPLES=OFF \
         -D INSTALL_PYTHON_EXAMPLES=OFF \
         -D BUILD_DOCS=OFF \
         -D BUILD_PERF_TESTS=OFF \
         -D BUILD_TESTS=OFF \
-        .. 
-
-# Build OpenCV
-RUN set -e; \
-    cd /tmp/opencv/build; \
-    make -j$CPU_CORES 
-
-# Install OpenCV
-RUN set -e; \
-    cd /tmp/opencv/build; \ 
-    make install; \
-    ldconfig; \
-    make clean
+        .. ; \
+    	make -j$CPU_CORES; \
+    	make install; \
+    	ldconfig; 
 
 # Clean up installation
 RUN set -e; \
