@@ -2,6 +2,7 @@ import pika
 import socketio
 import collections
 import math
+import async_timeout
 import asyncio
 from io import BytesIO
 import base64
@@ -70,64 +71,62 @@ def process_webstream(source):
     global Result, ConnectTime
     Result = {}
     sio = socketio.Client()
+    try:
+        async with async_timeout(30):
+            @sio.event
+            async def connect():
+                global ConnectTime
+                ConnectTime = time.time()
+                print('Connected at {}! Processing stream...'.format(ConnectTime))
     
-    def job_finished():
-        global Result
+            @sio.event
+            async def connect_error():
+                print("The connection failed!")
+
+            @sio.on('image')
+            async def on_image(message):
+                global Interpreter, Result
+                try:
+                    image = Image.open(BytesIO(base64.b64decode(message['data'])))
+                    common.set_input(Interpreter, image, resample='Image.NEAREST')
+                    start = time.time()
+                    await Interpreter.invoke()
+                    end = time.time()
+                    print('Interpreted image in {} seconds'.format(end - start))
+                    objects = get_output(Interpreter, score_threshold=THRESHOLD, top_k=TOP_K)
+                    if len(objects) > 0:
+                        print('Person detected!')
+                        Result = {
+                            'job_type': 'person_detection',
+                            'message': 'FOUND'
+                        }
+                        await sio.disconnect()
+                        return Result
+                except Exception as err:
+                    print('Error parsing message from socketio server: {}'.format(err))
+                    Result = {
+                        'job_type': 'person_detection',
+                        'message': 'INTERPRETER_ERROR: {}'.format(err)
+                    }
+                    await sio.disconnect()
+                    return Result
+            print('Connecting to {} at {}'.format(source, time.time()))
+            await sio.connect(source)
+    except asyncio.TimeoutError as err:
+        print('Disconnecting. Session expired: {}'.format(err))
         Result = {
             'job_type': 'person_detection',
-            'message': 'NONE'
+            'message': 'TIMEOUT: {}'.format(err)
         }
-        sio.sleep(30)
-        print('Notifying server of job finished: {}'.format(time.time()))
-        sio.emit('finished', 'FINISHED!')
-
-    @sio.event
-    def connect():
-        global ConnectTime
-        ConnectTime = time.time()
-        print('Connected at {}! Processing stream...'.format(ConnectTime))
-    
-    @sio.event
-    def connect_error():
-        print("The connection failed!")
-
-    @sio.on('image')
-    def on_image(message):
-        global Interpreter, Result, ConnectTime
-        if (time.time() < (ConnectTime + 30)):
-            try:
-                image = Image.open(BytesIO(base64.b64decode(message['data'])))
-                common.set_input(Interpreter, image)
-                start = time.time()
-                Interpreter.invoke()
-                end = time.time()
-                print('Interpreted image in {} seconds'.format(end - start))
-                objects = get_output(Interpreter, score_threshold=THRESHOLD, top_k=TOP_K)
-                if len(objects) > 0:
-                    print('Person detected!')
-                    Result = {
-                    'job_type': 'person_detection',
-                    'message': 'FOUND'
-                    }
-                    sio.disconnect()
-            except:
-                print('Error parsing message from socketio server')
-                sio.disconnect()
-        else:
-            print('Disconnecting. Session expired!')
-            sio.disconnect()
-
-    try:
-        print('Connecting to {} at {}'.format(source, time.time()))
-        sio.connect(source)
-        sio.start_background_task(job_finished)
-        sio.wait()
-    except:
-        print('Error connecting to {}'.format(source))
-    print('Job finished. Disconnected from server at {}. Result: {}'.format(source, Result))
-    print(time.time())
-
-    return Result
+        await sio.disconnect()
+        return Result
+    except Exception as err:
+        Result = {
+            'job_type': 'person_detection',
+            'message': 'EXCEPTION: {}'.format(err)
+        }
+        await sio.disconnect()
+        return Result
 
 def run(config, channel):
     global Interpreter
@@ -136,10 +135,10 @@ def run(config, channel):
         job_type, Interpreter, source = load_job(config, body)
         if job_type == 'person_detection':
             Result = process_webstream(source)
-        channel.basic_publish(exchange='',
-                      routing_key=config['output_interpreter_queue'],
-                      body=json.dumps(Result))
-        channel.basic_ack(method_frame.delivery_tag)
+            channel.basic_publish(exchange='',
+                  routing_key=config['output_interpreter_queue'],
+                  body=json.dumps(Result))
+            channel.basic_ack(method_frame.delivery_tag)
 
 
 if __name__ == '__main__':
