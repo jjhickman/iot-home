@@ -67,17 +67,15 @@ def load_job(config, job):
         print('Failed parsing job')
         return '', None, ''
 
-def process_webstream(source):
-    global Result, ConnectTime
+def process_webstream(config, source):
+    global Result
     Result = {}
     sio = socketio.Client()
     try:
-        async with async_timeout(30):
+        async with async_timeout(int(config['job_timeout_seconds'])):
             @sio.event
             async def connect():
-                global ConnectTime
-                ConnectTime = time.time()
-                print('Connected at {}! Processing stream...'.format(ConnectTime))
+                print('Connected at {}! Processing stream...'.format(time.time()))
     
             @sio.event
             async def connect_error():
@@ -88,12 +86,12 @@ def process_webstream(source):
                 global Interpreter, Result
                 try:
                     image = Image.open(BytesIO(base64.b64decode(message['data'])))
-                    common.set_input(Interpreter, image, resample='Image.NEAREST')
+                    common.set_input(Interpreter, image)
                     start = time.time()
                     await Interpreter.invoke()
                     end = time.time()
                     print('Interpreted image in {} ms'.format(1000*(end - start)))
-                    objects = get_output(Interpreter, score_threshold=THRESHOLD, top_k=TOP_K)
+                    objects = get_output(Interpreter, score_threshold=float(config['score_threshold']), top_k=int(config['top_k_items']))
                     if len(objects) > 0:
                         print('Person detected!')
                         Result = {
@@ -101,7 +99,7 @@ def process_webstream(source):
                             'message': 'FOUND'
                         }
                         await sio.disconnect()
-                        return Result
+                        #return Result
                 except Exception as err:
                     print('Error parsing message from socketio server: {}'.format(err))
                     Result = {
@@ -109,7 +107,7 @@ def process_webstream(source):
                         'message': 'INTERPRETER_ERROR: {}'.format(err)
                     }
                     await sio.disconnect()
-                    return Result
+                    #return Result
             print('Connecting to {} at {}'.format(source, time.time()))
             await sio.connect(source)
     except asyncio.TimeoutError as err:
@@ -119,14 +117,15 @@ def process_webstream(source):
             'message': 'TIMEOUT: {}'.format(err)
         }
         await sio.disconnect()
-        return Result
+        #return Result
     except Exception as err:
+        print('Exception processing stream: {}'.format(err))
         Result = {
             'job_type': 'person_detection',
             'message': 'EXCEPTION: {}'.format(err)
         }
         await sio.disconnect()
-        return Result
+    return Result
 
 def run(config, channel):
     global Interpreter
@@ -134,10 +133,10 @@ def run(config, channel):
         print('New RabbitMQ message: {}'.format(body))
         job_type, Interpreter, source = load_job(config, body)
         if job_type == 'person_detection':
-            Result = process_webstream(source)
+            result = await process_webstream(config, source)
             channel.basic_publish(exchange='',
                   routing_key=config['output_interpreter_queue'],
-                  body=json.dumps(Result))
+                  body=json.dumps(result))
             channel.basic_ack(method_frame.delivery_tag)
 
 

@@ -2,5 +2,8 @@
     "model_directory": "models",
     "rabbitmq_host": "localhost",
     "input_interpreter_queue": "input_interpreter_queue",
-    "output_interpreter_queue": "output_interpreter_queue"
+    "output_interpreter_queue": "output_interpreter_queue",
+    "job_timeout_seconds": 30,
+    "score_threshold": 0.4,
+    "top_k_items":  10
 }
