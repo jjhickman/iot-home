@@ -66,29 +66,29 @@ RUN set -e; \
         # Build without GPU support
         -D WITH_OPENCL=ON \
         -D WITH_CUDA=OFF \
-	-D OPENCV_GENERATE_PKGCONFIG=ON \
-	-D BUILD_NEW_PYTHON_SUPPORT=ON \
-	-D BUILD_opencv_python3=TRUE \
-	-D WITH_OPENMP=ON \
-	-D BUILD_TIFF=ON \
-	-D WITH_FFMPEG=ON \
-	-D WITH_GSTREAMER=ON \
-	-D WITH_TBB=ON \
-	-D BUILD_TBB=ON \
-	-D OPENCV_EXTRA_EXE_LINKER_FLAGS=-latomic \
-	-D WITH_EIGEN=OFF \
+	    -D OPENCV_GENERATE_PKGCONFIG=ON \
+	    -D BUILD_NEW_PYTHON_SUPPORT=ON \
+	    -D BUILD_opencv_python3=TRUE \
+	    -D WITH_OPENMP=ON \
+	    -D BUILD_TIFF=ON \
+	    -D WITH_FFMPEG=ON \
+	    -D WITH_GSTREAMER=ON \
+	    -D WITH_TBB=ON \
+	    -D BUILD_TBB=ON \
+	    -D OPENCV_EXTRA_EXE_LINKER_FLAGS=-latomic \
+	    -D WITH_EIGEN=OFF \
         # Build with python
         # Ignore all unnecessary stages
-       -D BUILD_EXAMPLES=OFF \
-      -D INSTALL_C_EXAMPLES=OFF \
+        -D BUILD_EXAMPLES=OFF \
+        -D INSTALL_C_EXAMPLES=OFF \
         -D INSTALL_PYTHON_EXAMPLES=OFF \
-       -D BUILD_DOCS=OFF \
+        -D BUILD_DOCS=OFF \
         -D BUILD_PERF_TESTS=OFF \
         -D BUILD_TESTS=OFF \
         .. ; \
-    	make -j$CPU_CORES; \
-    	make install; \
-    	ldconfig; 
+    make -j$CPU_CORES; \
+    make install; \
+    ldconfig; 
 
 # Clean up installation
 RUN set -e; \
@@ -97,10 +97,6 @@ RUN set -e; \
 	apt-get -y autoremove
 
 RUN touch /root/.bashrc && echo "export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1" > /root/.bashrc
-# Get application and dependencies
-#RUN git clone $REPOSITORY .
-#RUN cd /iot-home/iot-hub/panoptic-service; \
-#    pip install -r requirements.txt
 
 CMD ["/bin/bash"]
 # CMD ["pm2", "start", "infrared-security-webcam/app.py", "--interpreter", "python3.8", "--name", "infrared-security-webcam", "--restart-delay", "5000"]
