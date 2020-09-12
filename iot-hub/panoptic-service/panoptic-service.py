@@ -92,7 +92,7 @@ def process_webstream(source):
                     start = time.time()
                     await Interpreter.invoke()
                     end = time.time()
-                    print('Interpreted image in {} seconds'.format(end - start))
+                    print('Interpreted image in {} ms'.format(1000*(end - start)))
                     objects = get_output(Interpreter, score_threshold=THRESHOLD, top_k=TOP_K)
                     if len(objects) > 0:
                         print('Person detected!')
