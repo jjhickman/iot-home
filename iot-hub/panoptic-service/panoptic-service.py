@@ -59,6 +59,7 @@ def load_job(config, job):
         data = json.loads(job)
         source = data['source']
         job_type = data['job_type']
+        print('Loading job for {} doing {}'.format(data['source'], data['job_type']))
         job_interpreter = common.make_interpreter(config['model_directory'] + '/' + JOBS[job_type]['model'])
         job_interpreter.allocate_tensors()
         print('Loading job of type: {} with model {} using source {}'.format(job_type, JOBS[job_type]['model'], source))
@@ -72,7 +73,7 @@ def process_webstream(config, source):
     Result = {}
     sio = socketio.Client()
     try:
-        async with async_timeout(int(config['job_timeout_seconds'])):
+        with async_timeout(int(config['job_timeout_seconds'])):
             @sio.event
             async def connect():
                 print('Connected at {}! Processing stream...'.format(time.time()))
@@ -109,14 +110,14 @@ def process_webstream(config, source):
                     await sio.disconnect()
                     #return Result
             print('Connecting to {} at {}'.format(source, time.time()))
-            await sio.connect(source)
+            sio.connect(source)
     except asyncio.TimeoutError as err:
         print('Disconnecting. Session expired: {}'.format(err))
         Result = {
             'job_type': 'person_detection',
             'message': 'TIMEOUT: {}'.format(err)
         }
-        await sio.disconnect()
+        sio.disconnect()
         #return Result
     except Exception as err:
         print('Exception processing stream: {}'.format(err))
@@ -124,7 +125,7 @@ def process_webstream(config, source):
             'job_type': 'person_detection',
             'message': 'EXCEPTION: {}'.format(err)
         }
-        await sio.disconnect()
+        sio.disconnect()
     return Result
 
 def run(config, channel):
@@ -133,7 +134,7 @@ def run(config, channel):
         print('New RabbitMQ message: {}'.format(body))
         job_type, Interpreter, source = load_job(config, body)
         if job_type == 'person_detection':
-            result = await process_webstream(config, source)
+            result = process_webstream(config, source)
             channel.basic_publish(exchange='',
                   routing_key=config['output_interpreter_queue'],
                   body=json.dumps(result))
