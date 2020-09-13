@@ -65,10 +65,13 @@ async def sleep(request):
 """
 async def notify_hub(app, session):
     global stream_url
-    with async_timeout.timeout(app['config']['hub_wait_seconds']):
-        async with session.post(app['config']['hub_url'], data=stream_url) as response:
-            print('Notifying {}'.format(app['config']['hub_url']))
-            return await response.status, response.text()
+    try:
+        with async_timeout.timeout(app['config']['hub_wait_seconds']):
+            async with session.post(app['config']['hub_url'], data=stream_url) as response:
+                print('Notifying {}'.format(app['config']['hub_url']))
+                return await response.status, response.text()
+    except Exception as err:
+        return 500, err
 
 async def on_motion(app):
     global awake_time, cooldown_time
@@ -95,12 +98,10 @@ async def stream(app):
         while True:
             ret, frame = app['capture'].read()
             if ret == False:
-                print("FAILED READING FROM CAPTURE")
+                logger.info("FAILED READING FROM CAPTURE")
                 break
             ret, jpg_image = cv2.imencode('.jpg', frame)
             base64_image = base64.b64encode(jpg_image)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
             await app['socket'].emit('image', base64_image)
             await asyncio.sleep(refresh_ms)
         logger.debug('Ended stream!')
@@ -113,7 +114,6 @@ async def monitor(app):
     while True:
         await asyncio.sleep(0.01)
         if GPIO.input(pin) > 0:
-            print('Movement detected!')
             await on_motion(app)
 
 """
