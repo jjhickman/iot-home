@@ -4,7 +4,6 @@ WORKDIR /iot-home
 
 ARG OPENCV_VERSION=4.4.0
 ARG CPU_CORES=1
-ARG REPOSITORY=https://github.com/jjhickman/iot-home.git
 ENV OPENCV_VERSION=$OPENCV_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -43,10 +42,8 @@ RUN set -e; \
     cmake -D CMAKE_BUILD_TYPE=RELEASE \
         -D OPENCV_EXTRA_MODULES_PATH=/tmp/opencv_contrib/modules \
         -D CMAKE_INSTALL_PREFIX=/usr/local \
-        # Build without GUI support
         -D WITH_QT=OFF \
         -D WITH_GTK=OFF \
-        # Build without GPU support
         -D WITH_OPENCL=ON \
         -D WITH_CUDA=OFF \
 	    -D WITH_VTK=OFF \
@@ -77,7 +74,7 @@ RUN set -e; \
 RUN set -e; \
     rm -rf /tmp/*; \
     rm -rf /var/lib/apt/lists/*; \
-    dpkg -r --force-depends git cmake zip unzip;\
+    dpkg -r -P --force-depends git cmake zip unzip;\
 	apt-get -y autoremove
 
 CMD ["/bin/bash"]
