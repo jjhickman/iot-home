@@ -28,7 +28,7 @@ RUN set -e; \
     rm -rf node-v11.15.0-linux-armv6l.tar.gz; \
     npm install -g pm2
 
-# Download OpenCV and module source
+# Install OpenCV source and build/install
 RUN set -e; \
     cd /tmp; \
     wget -c -nv -O opencv.zip https://github.com/opencv/opencv/archive/$OPENCV_VERSION.zip; \
@@ -36,10 +36,7 @@ RUN set -e; \
     wget -c -nv -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/$OPENCV_VERSION.zip; \
     unzip opencv_contrib.zip; \
     mv opencv-${OPENCV_VERSION} opencv; \
-    mv opencv_contrib-${OPENCV_VERSION} opencv_contrib
-
-# Configure OpenCV
-RUN set -e; \
+    mv opencv_contrib-${OPENCV_VERSION} opencv_contrib; \
     cd /tmp/opencv; \
     mkdir build; \
     cd build; \
