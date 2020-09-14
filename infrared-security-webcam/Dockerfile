@@ -18,7 +18,8 @@ RUN set -e; \
     libavcodec-dev libavformat-dev libswscale-dev \
     libgtk2.0-dev libxvidcore-dev libx264-dev \
     libv4l-dev libatlas-base-dev libjasper-dev \
-    python3-dev python2.7-dev python3-pip; \
+    python3-dev python2.7-dev; \
+    apt-get install -y --no-install-recommends python3-pip; \
     pip3 install --upgrade pip; \
     pip3 install numpy
 
@@ -79,7 +80,8 @@ RUN set -e; \
     rm -rf /tmp/*; \
     rm -rf /var/lib/apt/lists/*; \
     dpkg -r -P --force-depends git cmake zip unzip;\
-	apt-get -y autoremove
+	apt-get -y autoremove; \
+    apt-get clean
 
 CMD ["/bin/bash"]
 # CMD ["pm2", "start", "infrared-security-webcam/app.py", "--interpreter", "python3.8", "--name", "infrared-security-webcam", "--restart-delay", "5000"]

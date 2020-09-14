@@ -17,7 +17,7 @@ RUN set -e; \
     libatlas-base-dev vim python3-dev python2.7-dev v4l-utils curl \
     gstreamer1.0-plugins-base  gstreamer1.0-plugins-good qtbase5-dev \
     qtdeclarative5-dev nodejs npm  gnupg2 gnupg ; \
-    python3-pip -y --no-install-recommends; \
+    apt-get install -y --no-install-recommends python3-pip; \
     pip3 install --upgrade pip && pip3 install numpy picamera \
     python-socketio async-timeout asyncio pika Pillow; \
     npm install -g pm2
@@ -82,6 +82,7 @@ RUN set -e; \
     rm -rf /var/lib/apt/lists/*; \
     dpkg -P -r --force-depends git curl wget; \
 	apt-get -y autoremove; \
+    apt-get clean; \
     touch /root/.bashrc; \
     echo "export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1" > /root/.bashrc
 
