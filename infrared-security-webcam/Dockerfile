@@ -6,6 +6,10 @@ ARG OPENCV_VERSION=4.4.0
 ARG CPU_CORES=1
 ENV OPENCV_VERSION=$OPENCV_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
+ENV PATH="$PATH:/opt/vc/bin"
+
+RUN echo "/opt/vc/lib" | tee --append /etc/ld.so.conf.d/00-vcms.conf; \
+    ldconfig
 
 # Install build dependencies
 RUN set -e; \

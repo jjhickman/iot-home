@@ -7,10 +7,6 @@ ARG CPU_CORES=4
 ARG REPOSITORY=https://github.com/jjhickman/iot-home.git
 ENV OPENCV_VERSION=$OPENCV_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
-ENV PATH="$PATH:/opt/vc/bin"
-
-RUN echo "/opt/vc/lib" | tee --append /etc/ld.so.conf.d/00-vcms.conf; \
-    ldconfig
 
 # Install build dependencies
 RUN set -e; \
