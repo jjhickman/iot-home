@@ -79,7 +79,7 @@ RUN set -e; \
 RUN set -e; \
     rm -rf /tmp/*; \
     rm -rf /var/lib/apt/lists/*; \
-    dpkg -r -P --force-depends git cmake zip unzip;\
+    dpkg -P --force-depends git cmake zip unzip;\
 	apt-get -y autoremove; \
     apt-get clean
 

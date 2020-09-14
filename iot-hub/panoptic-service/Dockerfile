@@ -80,7 +80,7 @@ RUN set -e; \
 RUN set -e; \
     rm -rf /tmp/*; \
     rm -rf /var/lib/apt/lists/*; \
-    dpkg -P -r --force-depends git curl wget; \
+    dpkg -P --force-depends git curl wget; \
 	apt-get -y autoremove; \
     apt-get clean; \
     touch /root/.bashrc; \
