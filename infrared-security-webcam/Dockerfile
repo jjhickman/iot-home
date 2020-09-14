@@ -15,27 +15,18 @@ RUN set -e; \
     libavcodec-dev libavformat-dev libswscale-dev \
     libgtk2.0-dev libxvidcore-dev libx264-dev \
     libv4l-dev libatlas-base-dev libjasper-dev \
-    vim python3-dev python2.7-dev
-
-# Installing build tools and dependencies.
-RUN rm -rf /var/lib/apt/lists/* \
-	&& apt-get -y autoremove
-
+    python3-dev python2.7-dev python3-pip; \
+    pip3 install --upgrade pip; \
+    pip3 install numpy
 
 # Install Node.js build for ARMv6l
 RUN set -e; \
     cd /tmp; \
     wget https://nodejs.org/dist/v11.15.0/node-v11.15.0-linux-armv6l.tar.gz; \
     tar -xzf node-v11.15.0-linux-armv6l.tar.gz; \
-    cp -R node-v11.15.0-linux-armv6l/* /usr/local/
-
-# install PM2 to run daemon app
-RUN npm install -g pm2
-
-RUN apt-get update && apt-get install python3-pip python3-dev -y --no-install-recommends
-
-# Install NumPy dependency for OpenCV
-RUN pip3 install --upgrade pip && pip3 install numpy
+    cp -R node-v11.15.0-linux-armv6l/* /usr/local/; \
+    rm -rf node-v11.15.0-linux-armv6l.tar.gz; \
+    npm install -g pm2
 
 # Download OpenCV and module source
 RUN set -e; \
@@ -61,21 +52,19 @@ RUN set -e; \
         # Build without GPU support
         -D WITH_OPENCL=ON \
         -D WITH_CUDA=OFF \
-	-D WITH_VTK=OFF \
-	-D WITH_QT=OFF \
-	-D OPENCV_GENERATE_PKGCONFIG=ON \
-	-D BUILD_NEW_PYTHON_SUPPORT=ON \
-	-D BUILD_opencv_python3=TRUE \
-	-D WITH_OPENMP=ON \
-	-D BUILD_TIFF=ON \
-	-D WITH_FFMPEG=ON \
-	-D WITH_GSTREAMER=ON \
-	-D WITH_TBB=ON \
-	-D BUILD_TBB=ON \
-	-D OPENCV_EXTRA_EXE_LINKER_FLAGS=-latomic \
-	-D WITH_EIGEN=OFF \
-        # Build with python
-        # Ignore all unnecessary stages
+	    -D WITH_VTK=OFF \
+	    -D WITH_QT=OFF \
+	    -D OPENCV_GENERATE_PKGCONFIG=ON \
+	    -D BUILD_NEW_PYTHON_SUPPORT=ON \
+	    -D BUILD_opencv_python3=TRUE \
+	    -D WITH_OPENMP=ON \
+	    -D BUILD_TIFF=ON \
+	    -D WITH_FFMPEG=ON \
+	    -D WITH_GSTREAMER=ON \
+	    -D WITH_TBB=ON \
+	    -D BUILD_TBB=ON \
+	    -D OPENCV_EXTRA_EXE_LINKER_FLAGS=-latomic \
+	    -D WITH_EIGEN=OFF \
         -D BUILD_EXAMPLES=OFF \
         -D INSTALL_C_EXAMPLES=OFF \
         -D INSTALL_PYTHON_EXAMPLES=OFF \
@@ -89,12 +78,10 @@ RUN set -e; \
 
 # Clean up installation
 RUN set -e; \
-    rm -rf /tmp/*
-
-# Get application and dependencies
-#RUN git clone $REPOSITORY .
-#RUN cd /infrared-security-webcam; \
-#    pip install -r requirements.txt
+    rm -rf /tmp/*; \
+    rm -rf /var/lib/apt/lists/*; \
+    dpkg -r --force-depends git cmake ;\
+	apt-get -y autoremove
 
 CMD ["/bin/bash"]
 # CMD ["pm2", "start", "infrared-security-webcam/app.py", "--interpreter", "python3.8", "--name", "infrared-security-webcam", "--restart-delay", "5000"]
