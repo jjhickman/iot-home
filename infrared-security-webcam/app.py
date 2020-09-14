@@ -1,4 +1,5 @@
 import time
+import socket
 import asyncio
 import socketio
 import netifaces as ni
@@ -29,16 +30,16 @@ sio = socketio.AsyncServer()
 # GET request handler for stream
 async def index(request):
     index_html = """<html>
-    <head><title>""" + stream_url + """</title></head>
+    <head><title>""" + socket.gethostname() + """</title></head>
         <body>
-        <h1>""" + stream_url + """</h1>
+        <h1>""" + socket.gethostname() + """</h1>
         <img id='image' src=''/>
         <script src='https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.7.4/socket.io.js'></script>
         <script>
             const socket = io.connect('""" + stream_url + """');
             socket.on('image', (image) => {
-                document.getElementById('image').src = 'data:image/jpeg;base64, ' + image;
-                console.log(document.getElementById('image').src)
+                let imageStr = new TextDecoder("utf-8").decode(image);
+                document.getElementById('image').src = 'data:image/jpeg;base64,' + imageStr;
             });
         </script>
     </body>
@@ -53,8 +54,8 @@ async def sleep(request):
     if sleep_seconds > 0:
         awake_time = time.time() + sleep_seconds
         update = 'Sleeping for {} seconds, waking at {}'.format(sleep_seconds, time.ctime(awake_time))
-        logger.info(update)
-        return await web.Response(text=update)
+        logger.debug(update)
+        return web.Response(text=update)
     return web.Response(status=404, text='Invalid number of seconds in request: {}'.format(sleep_seconds))
 
 
@@ -68,7 +69,6 @@ async def notify_hub(app, session):
     try:
         with async_timeout.timeout(app['config']['hub_wait_seconds']):
             async with session.post(app['config']['hub_url'], data=stream_url) as response:
-                print('Notifying {}'.format(app['config']['hub_url']))
                 return await response.status, response.text()
     except Exception as err:
         return 500, err
@@ -112,8 +112,9 @@ async def stream(app):
 async def monitor(app):
     pin = app['gpio_pin']
     while True:
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.05)
         if GPIO.input(pin) > 0:
+            logger.debug('Motion detected: {}'.format(pin))
             await on_motion(app)
 
 """
