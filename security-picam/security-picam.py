@@ -1,4 +1,6 @@
 import time
+import sys
+import argparse
 import socket
 import asyncio
 import socketio
@@ -15,7 +17,7 @@ import json
 import aiohttp
 from aiohttp import web
 from middleware import setup_middlewares
-logger = logging.getLogger('aiohttp.server')
+http_logger = logging.getLogger('aiohttp.server')
 
 awake_time = -1
 cooldown_time = -1
@@ -67,8 +69,8 @@ async def sleep(request):
 async def notify_hub(app, session):
     global stream_url
     try:
-        with async_timeout.timeout(app['config']['hub_wait_seconds']):
-            async with session.post(app['config']['hub_url'], data=stream_url) as response:
+        with async_timeout.timeout(5):
+            async with session.post(app['config']['hub-url'], data=stream_url) as response:
                 return await response.status, response.text()
     except Exception as err:
         return 500, err
@@ -77,8 +79,8 @@ async def on_motion(app):
     global awake_time, cooldown_time
     epoch_time = time.time()
     if epoch_time > cooldown_time and epoch_time > awake_time:
-        logger.info('Notifying hub at {}'.format(app['config']['hub_url']))
-        cooldown_time = epoch_time + int(app['config']['cooldown_seconds'])
+        logger.info('Notifying hub at {}'.format(app['config']['hub-url']))
+        cooldown_time = epoch_time + int(app['config']['cooldown-seconds'])
         async with aiohttp.ClientSession() as session:
             status, response = await notify_hub(app, session)
             if status != 200:
@@ -92,13 +94,13 @@ async def on_motion(app):
 =============================================================================
 """
 async def stream(app):
-    refresh_ms = 1.0 / int(app['config']['fps'])
+    refresh_ms = 1.0 / int(app['config']['stream-fps'])
     logger.debug('Updating stream every {} ms'.format(refresh_ms))
     try:
         while True:
             ret, frame = app['capture'].read()
             if ret == False:
-                logger.info("FAILED READING FROM CAPTURE")
+                http_logger.info("FAILED READING FROM CAPTURE")
                 break
             ret, jpg_image = cv2.imencode('.jpg', frame)
             base64_image = base64.b64encode(jpg_image)
@@ -143,21 +145,40 @@ def disconnect(sid):
 """
 def initialize():
     global sio, stream_url
-    config = None
-    with open('./config.json') as f:
-        config = json.load(f)
-    app = web.Application()
-    app['config'] = config
-    
+
     wifi_address =  ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
-    stream_url = 'http://{}:{}'.format(wifi_address, app['config']['port'])
+
+    parser = argparse.ArgumentParser(description='Raspberry Pi Infrared Security Camera')
+    parser.add_argument('--gpio-pin', type=int, help='GPIO pin for infrared sensor signal', default=23)
+    parser.add_argument('--stream-port', type=int, help='Port for camera stream', default=3000)
+    parser.add_argument('--stream-fps', type=int, help='Frames per second for camera stream', default=24)
+    parser.add_argument('--hub-url', type=str, help='Full URL for IoT hub REST API', default='http://192.168.50.110:8881')
+    parser.add_argument('--cooldown-seconds', type=int, help='Number of seconds after notifying hub that it can repeat', default=30)
+    parser.add_argument('--log-level', type=int, help='Debug level for logging', default=logging.DEBUG)
+    parser.add_argument('--log-file', type=str, help='File to log to', default='picam_' + wifi_address + '.log')
+    args = parser.parse_args()
+
+    log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+    logger = logging.getLogger(__name__)
+    logger.setLevel(args['log-level'])
+    file_handler = logging.RotatingFileHandler(args['log-file'], maxBytes=5000, backupCount=10)
+    file_handler.setFormatter(log_formatter)
+    logger.addHandler(file_handler)
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(log_formatter)
+    logger.addHandler(console_handler)
+
+    app = web.Application()
+    app['config'] = args
+    
+    stream_url = 'http://{}:{}'.format(wifi_address, app['config']['stream-port'])
 
     sio.attach(app)
     app['socket'] = sio
 
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(int(app['config']['infrared_gpio']), GPIO.IN)
-    app['gpio_pin'] = int(app['config']['infrared_gpio'])
+    GPIO.setup(int(app['config']['gpio-pin']), GPIO.IN)
+    app['gpio_pin'] = app['config']['gpio-pin']
 
     app.router.add_get('/', index)
     app.router.add_post('/sleep/{sleep_seconds}', sleep)
@@ -177,6 +198,5 @@ async def cleanup_tasks(app):
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
     app, wifi_address = initialize()
-    web.run_app(app, host=wifi_address, port=app['config']['port'])
+    web.run_app(app, host=wifi_address, port=app['config']['stream-port'])

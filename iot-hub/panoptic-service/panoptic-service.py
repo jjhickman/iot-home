@@ -145,12 +145,15 @@ if __name__ == '__main__':
     with open('./config.json') as contents:
         config = json.load(contents)
     print('Config: {}'.format(config))
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host=config['rabbitmq_host']))
-    channel = connection.channel()
-    channel.basic_qos(prefetch_count=1) # tell RabbitMQ not to give more than one message at a time
+    try:
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=config['rabbitmq_host']))
+        channel = connection.channel()
+        channel.basic_qos(prefetch_count=1) # tell RabbitMQ not to give more than one message at a time
 
-    run(config, channel) # main service loop
+        run(config, channel) # main service loop
 
-    requeued_messages = channel.cancel()
-    print('Requeued %i messages' % requeued_messages)
-    connection.close()
+        requeued_messages = channel.cancel()
+        print('Requeued %i messages' % requeued_messages)
+        connection.close()
+    except pika.exceptions.AMQPConnectionError:
+        print('Error connecting to RabbitMQ service. Exiting...')
