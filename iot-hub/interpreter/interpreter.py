@@ -4,6 +4,7 @@ import os
 import datetime
 import argparse
 import logging
+import logging.handlers
 import socketio
 import collections
 import math
@@ -65,7 +66,7 @@ def load_job(config, job):
         source = data['source']
         job_type = data['job_type']
         logger.debug('Loading job for {} doing {}'.format(data['source'], data['job_type']))
-        job_interpreter = common.make_interpreter(os.path.join(config['models'] , JOBS[job_type]['model']))
+        job_interpreter = common.make_interpreter(os.path.join(config.models , JOBS[job_type]['model']))
         job_interpreter.allocate_tensors()
         logger.debug('Loading job of type: {} with model {} using source {}'.format(job_type, JOBS[job_type]['model'], source))
         return job_type, job_interpreter, source
@@ -78,7 +79,7 @@ def process_webstream(config, source):
     Result = {}
     sio = socketio.Client()
     try:
-        with async_timeout(config['job-timeout']):
+        with async_timeout(config.job_timeout):
             @sio.event
             async def connect():
                 logger.debug('Connected at {}! Processing stream...'.format(datetime.datetime.now()))
@@ -97,10 +98,10 @@ def process_webstream(config, source):
                     await Interpreter.invoke()
                     end = time.time()
                     logger.debug('Interpreted image in {} ms'.format(1000*(end - start)))
-                    objects = get_output(Interpreter, score_threshold=config['threshold'], top_k=config['top-k'])
+                    objects = get_output(Interpreter, score_threshold=config.threshold, top_k=config.top_k)
                     if len(objects) > 0:
                         logger.info('Person detected!')
-                        filepath = os.path.join(config['images'], '{}.jpg'.format(datetime.datetime.now()))
+                        filepath = os.path.join(config.images, '{}.jpg'.format(datetime.datetime.now()))
                         Result = {
                             'job_type': 'person_detection',
                             'message': 'FOUND',
@@ -135,14 +136,14 @@ def process_webstream(config, source):
 
 def run(config, channel):
     global Interpreter
-    for method_frame, _, body in channel.consume(config['input-queue']):
+    for method_frame, _, body in channel.consume(config.input-queue):
         logger.info('New RabbitMQ message: {}'.format(body))
         job_type, Interpreter, source = load_job(config, body)
         if job_type == 'person_detection':
             result = process_webstream(config, source)
             try:
                 channel.basic_publish(exchange='',
-                    routing_key=config['output-queue'],
+                    routing_key=config.output_queue,
                     body=json.dumps(result))
                 channel.basic_ack(method_frame.delivery_tag)
             except pika.exceptions.ConnectionClosed as e:
@@ -151,35 +152,35 @@ def run(config, channel):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Tensorflow Lite Interpreter Service')
-    parser.add_argument('--job-timeout', type=int, help='Max processing time for job in seconds', default=30)
-    parser.add_argument('--rabbitmq-host', type=str, help='Hostname for RabbitMQ broker', default='localhost')
-    parser.add_argument('--input-queue', type=str, help='Input queue for interpreter jobs', default='input_queue')
-    parser.add_argument('--output-queue', type=str, help='Output queue for interpreter jobs', default='output_queue')
+    parser.add_argument('--job_timeout', type=int, help='Max processing time for job in seconds', default=30)
+    parser.add_argument('--rabbitmq_host', type=str, help='Hostname for RabbitMQ broker', default='localhost')
+    parser.add_argument('--input_queue', type=str, help='Input queue for interpreter jobs', default='input_queue')
+    parser.add_argument('--output_queue', type=str, help='Output queue for interpreter jobs', default='output_queue')
     parser.add_argument('--models', type=str, help='Directory for Tensorflow Lite models', default='./models')
     parser.add_argument('--images', type=str, help='Directory for Tensorflow Lite models', default='./images')
-    parser.add_argument('--top-k', type=int, help='Top k number of identified anomalies of interest', default=10)
+    parser.add_argument('--top_k', type=int, help='Top k number of identified anomalies of interest', default=10)
     parser.add_argument('--threshold', type=float, help='Confidence threshold for model(s)', default=0.4)
-    parser.add_argument('--log-level', type=int, help='Debug level for logging', default=logging.DEBUG)
-    parser.add_argument('--log-file', type=str, help='File to log to', default='interpreter.log')
+    parser.add_argument('--log_level', type=int, help='Debug level for logging', default=logging.DEBUG)
+    parser.add_argument('--log_file', type=str, help='File to log to', default='./interpreter.log')
     config = parser.parse_args()
 
     log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
     logger = logging.getLogger('interpreter')
-    logger.setLevel(config['log-level'])
-    if os.path.isdir(os.path.dirname(config['log-file'])) == False:
-        os.makedirs(os.path.dirname(config['log-file']), exist_ok = True)
-    file_handler = logging.RotatingFileHandler(config['log-file'], maxBytes=5000000, backupCount=10)
+    logger.setLevel(config.log_level)
+    if os.path.isdir(os.path.dirname(config.log_file)) == False:
+        os.makedirs(os.path.dirname(config.log_file), exist_ok = True)
+    file_handler = logging.handlers.RotatingFileHandler(config.log_file, maxBytes=5000000, backupCount=10)
     file_handler.setFormatter(log_formatter)
     logger.addHandler(file_handler)
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_formatter)
     logger.addHandler(console_handler)
 
-    if os.path.isdir(config['images']) == False:
-        os.makedirs(config['images'], exist_ok = True)
+    if os.path.isdir(config.images) == False:
+        os.makedirs(config.images, exist_ok = True)
 
     try:
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host=config['rabbitmq-host']))
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=config.rabbitmq_host))
         channel = connection.channel()
         channel.basic_qos(prefetch_count=1) # tell RabbitMQ not to give more than one message at a time
 

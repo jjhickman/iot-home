@@ -14,23 +14,17 @@ RUN echo "/opt/vc/lib" | tee --append /etc/ld.so.conf.d/00-vcms.conf; \
 # Install build dependencies
 RUN set -e; \
     apt-get update && apt-get install -y --no-install-recommends \
-    build-essential apt-utils cmake wget git pkg-config gfortran zip unzip libjpeg-dev libtiff5-dev \
+    build-essential apt-utils cmake wget git pkg-config gfortran unzip libjpeg-dev libtiff5-dev \
     libavcodec-dev libavformat-dev libswscale-dev \
     libgtk2.0-dev libxvidcore-dev libx264-dev \
     libv4l-dev libatlas-base-dev libjasper-dev \
     python3-dev python2.7-dev; \
     apt-get install -y --no-install-recommends python3-pip; \
     pip3 install --upgrade pip; \
-    pip3 install numpy
-
-# Install Node.js build for ARMv6l
-RUN set -e; \
-    cd /tmp; \
-    wget https://nodejs.org/dist/v11.15.0/node-v11.15.0-linux-armv6l.tar.gz; \
-    tar -xzf node-v11.15.0-linux-armv6l.tar.gz; \
-    cp -R node-v11.15.0-linux-armv6l/* /usr/local/; \
-    rm -rf node-v11.15.0-linux-armv6l.tar.gz; \
-    npm install -g pm2
+    pip3 install numpy --no-cache-dir; \
+    apt-get clean; \
+    apt-get -y autoremove; \
+    rm -rf /var/lib/apt/lists/*;
 
 # Install OpenCV source and build/install
 RUN set -e; \
@@ -73,15 +67,7 @@ RUN set -e; \
         .. ; \
     	make -j$CPU_CORES; \
     	make install; \
-    	ldconfig; 
-
-# Clean up installation
-RUN set -e; \
-    rm -rf /tmp/*; \
-    rm -rf /var/lib/apt/lists/*; \
-    dpkg -P --force-depends git cmake zip unzip;\
-	apt-get -y autoremove; \
-    apt-get clean
+    	ldconfig; \
+        rm -rf /tmp/*
 
 CMD ["/bin/bash"]
-# CMD ["pm2", "start", "infrared-security-webcam/app.py", "--interpreter", "python3.8", "--name", "infrared-security-webcam", "--restart-delay", "5000"]

@@ -1,6 +1,5 @@
-#FROM raspbian/stretch:latest
-FROM arm64v8/ubuntu:focal
-WORKDIR /iot-home
+FROM arm64v8/ubuntu:focal AS builder
+WORKDIR /interpreter-builder
 
 ARG OPENCV_VERSION=4.4.0
 ARG CPU_CORES=4
@@ -14,13 +13,15 @@ RUN set -e; \
     build-essential apt-utils cmake wget git pkg-config gfortran zip \
     unzip libjpeg-dev libtiff5-dev libavcodec-dev libavformat-dev \
     libswscale-dev libgtk2.0-dev libxvidcore-dev libx264-dev libv4l-dev \
-    libatlas-base-dev vim python3-dev python2.7-dev v4l-utils curl \
+    libatlas-base-dev python3-dev python2.7-dev v4l-utils curl \
     gstreamer1.0-plugins-base  gstreamer1.0-plugins-good qtbase5-dev \
-    qtdeclarative5-dev nodejs npm  gnupg2 gnupg ; \
+    qtdeclarative5-dev gnupg2 gnupg ; \
     apt-get install -y --no-install-recommends python3-pip; \
-    pip3 install --upgrade pip && pip3 install numpy picamera \
-    python-socketio async-timeout asyncio pika Pillow; \
-    npm install -g pm2
+    pip3 install --upgrade pip && pip3 install numpy \
+    python-socketio async-timeout asyncio pika Pillow --no-cache-dir; \
+    apt-get clean; \
+    apt-get -y autoremove; \
+    rm -rf /var/lib/apt/lists/*;
 
 # Setup for Coral Edge TPU
 RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee --append /etc/apt/sources.list.d/coral-edgetpu.list; \
@@ -74,17 +75,26 @@ RUN set -e; \
         .. ; \
     make -j$CPU_CORES; \
     make install; \
-    ldconfig; 
+    ldconfig; \
+    rm -rf /tmp/*
 
-# Clean up installation and set environment variable
+RUN apt-get purge -y build-essential apt-utils cmake wget git pkg-config gfortran zip \
+    unzip libjpeg-dev libtiff5-dev libavcodec-dev libavformat-dev \
+    libswscale-dev libgtk2.0-dev libxvidcore-dev libx264-dev libv4l-dev \
+    libatlas-base-dev python3-dev python2.7-dev v4l-utils curl \
+    gstreamer1.0-plugins-base  gstreamer1.0-plugins-good qtbase5-dev \
+    qtdeclarative5-dev gnupg2 gnupg 
+
+#FROM arm64v8/alpine:latest
+FROM arm64v8/ubuntu:focal
+WORKDIR /interpreter-service
+COPY --from=builder /usr/local/ /usr/local/
+COPY --from=builder /bin/ /bin/
+COPY --from=builder /etc/ /etc/
+COPY --from=builder /lib/ /lib/
+COPY . /interpreter-service
 RUN set -e; \
-    rm -rf /tmp/*; \
-    rm -rf /var/lib/apt/lists/*; \
-    dpkg -P --force-depends git curl wget; \
-	apt-get -y autoremove; \
-    apt-get clean; \
     touch /root/.bashrc; \
     echo "export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1" > /root/.bashrc
 
-CMD ["/bin/bash"]
-# CMD ["pm2", "start", "iot-hub/panoptic-service.py", "--interpreter", "python3.8", "--name", "panoptic-service", "--restart-delay", "5000"]
+CMD ["python3", "interpreter.py"]
