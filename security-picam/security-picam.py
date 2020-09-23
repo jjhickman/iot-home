@@ -159,9 +159,11 @@ def initialize():
     args = parser.parse_args()
 
     log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger('security-picam')
     logger.setLevel(args['log-level'])
-    file_handler = logging.RotatingFileHandler(args['log-file'], maxBytes=5000, backupCount=10)
+    if os.path.isdir(os.path.dirname(config['log-file'])) == False:
+        os.makedirs(os.path.dirname(config['log-file']), exist_ok = True)
+    file_handler = logging.RotatingFileHandler(args['log-file'], maxBytes=5000000, backupCount=10)
     file_handler.setFormatter(log_formatter)
     logger.addHandler(file_handler)
     console_handler = logging.StreamHandler()
