@@ -1,9 +1,9 @@
-FROM raspbian/stretch:latest
+FROM raspbian/stretch:latest AS builder
 
-WORKDIR /iot-home
+WORKDIR /builder
 
 ARG OPENCV_VERSION=4.4.0
-ARG CPU_CORES=1
+ARG CPU_CORES=4
 ENV OPENCV_VERSION=$OPENCV_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
 ENV PATH="$PATH:/opt/vc/bin"
@@ -70,4 +70,12 @@ RUN set -e; \
     	ldconfig; \
         rm -rf /tmp/*
 
-CMD ["/bin/bash"]
+FROM raspbian/stretch:latest
+WORKDIR /security-picam
+COPY --from=builder /usr/local/ /usr/local/
+COPY --from=builder /bin/ /bin/
+COPY --from=builder /etc/ /etc/
+COPY --from=builder /lib/ /lib/
+COPY . /security-picam
+
+CMD ["python3", " security-picam.py"]

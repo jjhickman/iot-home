@@ -87,14 +87,27 @@ RUN apt-get purge -y build-essential apt-utils cmake wget git pkg-config gfortra
 
 #FROM arm64v8/alpine:latest
 FROM arm64v8/ubuntu:focal
-WORKDIR /interpreter-service
+
+ENV JOB_TIMEOUT_SEC=30
+ENV RABBITMQ_HOST=localhost
+ENV INPUT_QUEUE=input
+ENV OUTPUT_QUEUE=output
+ENV MODELS_DIR=/interpreter/models
+ENV IMAGES_DIR=/interpreter/images
+ENV TOP_K_OBJECTS=10
+ENV OBJECT_THRESHOLD=0.4
+ENV LOG_DIR=/interpreter/log
+ENV LOG_LEVEL=INFO
+
+WORKDIR /interpreter
 COPY --from=builder /usr/local/ /usr/local/
 COPY --from=builder /bin/ /bin/
 COPY --from=builder /etc/ /etc/
 COPY --from=builder /lib/ /lib/
-COPY . /interpreter-service
+COPY . /interpreter
 RUN set -e; \
     touch /root/.bashrc; \
     echo "export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1" > /root/.bashrc
+
 
 CMD ["python3", "interpreter.py"]

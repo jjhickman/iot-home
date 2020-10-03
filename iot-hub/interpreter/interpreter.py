@@ -1,10 +1,12 @@
 import pika
 import sys
 import os
+import variables import Variables
 import datetime
 import argparse
 import logging
 import logging.handlers
+import socket
 import socketio
 import collections
 import math
@@ -26,8 +28,6 @@ JOBS = {
         'model': 'mobilenet_ssd_v2_face_quant_postprocess_edgetpu.tflite'
     }
 }
-THRESHOLD = 0.4
-TOP_K = 10
 
 ConnectTime = time.time()
 Interpreter = None
@@ -136,7 +136,7 @@ def process_webstream(config, source):
 
 def run(config, channel):
     global Interpreter
-    for method_frame, _, body in channel.consume(config.input-queue):
+    for method_frame, _, body in channel.consume(config.input_queue):
         logger.info('New RabbitMQ message: {}'.format(body))
         job_type, Interpreter, source = load_job(config, body)
         if job_type == 'person_detection':
@@ -151,25 +151,15 @@ def run(config, channel):
                 return
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Tensorflow Lite Interpreter Service')
-    parser.add_argument('--job_timeout', type=int, help='Max processing time for job in seconds', default=30)
-    parser.add_argument('--rabbitmq_host', type=str, help='Hostname for RabbitMQ broker', default='localhost')
-    parser.add_argument('--input_queue', type=str, help='Input queue for interpreter jobs', default='input_queue')
-    parser.add_argument('--output_queue', type=str, help='Output queue for interpreter jobs', default='output_queue')
-    parser.add_argument('--models', type=str, help='Directory for Tensorflow Lite models', default='./models')
-    parser.add_argument('--images', type=str, help='Directory for Tensorflow Lite models', default='./images')
-    parser.add_argument('--top_k', type=int, help='Top k number of identified anomalies of interest', default=10)
-    parser.add_argument('--threshold', type=float, help='Confidence threshold for model(s)', default=0.4)
-    parser.add_argument('--log_level', type=int, help='Debug level for logging', default=logging.DEBUG)
-    parser.add_argument('--log_file', type=str, help='File to log to', default='./interpreter.log')
-    config = parser.parse_args()
 
+    config = Variables()
     log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
     logger = logging.getLogger('interpreter')
     logger.setLevel(config.log_level)
-    if os.path.isdir(os.path.dirname(config.log_file)) == False:
-        os.makedirs(os.path.dirname(config.log_file), exist_ok = True)
-    file_handler = logging.handlers.RotatingFileHandler(config.log_file, maxBytes=5000000, backupCount=10)
+    if os.path.isdir(os.path.dirname(config.log_dir)) == False:
+        os.makedirs(os.path.dirname(config.log_dir), exist_ok = True)
+    
+    file_handler = logging.handlers.RotatingFileHandler(os.path.join(config.log_dir, '{}.log'.format(socket.gethostname())), maxBytes=5000000, backupCount=10)
     file_handler.setFormatter(log_formatter)
     logger.addHandler(file_handler)
     console_handler = logging.StreamHandler()
