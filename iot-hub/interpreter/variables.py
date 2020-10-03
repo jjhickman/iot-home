@@ -2,7 +2,7 @@ import os
 import logging
 
 class Variables:
-    def __init__():
+    def __init__(self):
         self.rabbitmq_host = os.getenv('RABBITMQ_HOST')
         if self.rabbitmq_host == None:
             self.rabbitmq_host = 'localhost'
@@ -12,8 +12,8 @@ class Variables:
             self.input_queue = 'input'
 
         self.output_queue = os.getenv('OUTPUT_QUEUE')
-        if self.input_queue == None:
-            self.input_queue = 'output'
+        if self.output_queue == None:
+            self.output_queue = 'output'
 
         self.log_level = os.getenv('LOG_LEVEL')
         if self.log_level == None:

@@ -1,7 +1,7 @@
 import pika
 import sys
 import os
-import variables import Variables
+from variables import Variables
 import datetime
 import argparse
 import logging
@@ -73,6 +73,9 @@ def load_job(config, job):
     except ValueError as e:
         logger.error('Failed parsing job: {}'.format(e))
         return '', None, ''
+    except KeyError as e:
+        logger.error('Failed parsing job: {}'.format(e))
+        return '', None, ''
 
 def process_webstream(config, source):
     global Result
@@ -131,24 +134,23 @@ def process_webstream(config, source):
             'job_type': 'person_detection',
             'message': 'EXCEPTION: {}'.format(e)
         }
-        sio.disconnect()
     return Result
 
 def run(config, channel):
     global Interpreter
     for method_frame, _, body in channel.consume(config.input_queue):
         logger.info('New RabbitMQ message: {}'.format(body))
-        job_type, Interpreter, source = load_job(config, body)
-        if job_type == 'person_detection':
-            result = process_webstream(config, source)
-            try:
+        try:
+            job_type, Interpreter, source = load_job(config, body)
+            if job_type == 'person_detection':
+                result = process_webstream(config, source)
                 channel.basic_publish(exchange='',
                     routing_key=config.output_queue,
                     body=json.dumps(result))
-                channel.basic_ack(method_frame.delivery_tag)
-            except pika.exceptions.ConnectionClosed as e:
-                logger.error('Error notifying job complete: {}'.format(e))
-                return
+            channel.basic_ack(method_frame.delivery_tag)
+        except pika.exceptions.ConnectionClosed as e:
+            logger.error('Error notifying job complete: {}'.format(e))
+            return
 
 if __name__ == '__main__':
 
@@ -170,7 +172,9 @@ if __name__ == '__main__':
         os.makedirs(config.images, exist_ok = True)
 
     try:
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host=config.rabbitmq_host))
+        credentials = pika.PlainCredentials(config.rabbitmq_user, config.rabbitmq_password)
+        parameters = pika.ConnectionParameters(host=config.rabbitmq_host, credentials=credentials)
+        connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
         channel.basic_qos(prefetch_count=1) # tell RabbitMQ not to give more than one message at a time
 
