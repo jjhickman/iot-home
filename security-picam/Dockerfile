@@ -70,12 +70,11 @@ RUN set -e; \
     	ldconfig; \
         rm -rf /tmp/*
 
-RUN apt-get purge -y build-essential apt-utils cmake wget git pkg-config gfortran zip \
-    unzip libjpeg-dev libtiff5-dev libavcodec-dev libavformat-dev \
-    libswscale-dev libgtk2.0-dev libxvidcore-dev libx264-dev libv4l-dev \
-    libatlas-base-dev python3-dev python2.7-dev v4l-utils curl \
-    gstreamer1.0-plugins-base  gstreamer1.0-plugins-good qtbase5-dev \
-    qtdeclarative5-dev gnupg2 gnupg 
+RUN apt-get purge -y build-essential apt-utils cmake wget git pkg-config gfortran unzip libjpeg-dev libtiff5-dev \
+    libavcodec-dev libavformat-dev libswscale-dev \
+    libgtk2.0-dev libxvidcore-dev libx264-dev \
+    libv4l-dev libatlas-base-dev libjasper-dev \
+    python3-dev python2.7-dev; 
 
 FROM raspbian/stretch:latest
 WORKDIR /security-picam
@@ -85,4 +84,4 @@ COPY --from=builder /etc/ /etc/
 COPY --from=builder /lib/ /lib/
 COPY . /security-picam
 
-CMD ["python3", " security-picam.py"]
+CMD ["python", "security-picam.py"]

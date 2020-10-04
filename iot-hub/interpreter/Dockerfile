@@ -110,4 +110,4 @@ RUN set -e; \
     echo "export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1" > /root/.bashrc
 
 
-CMD ["python3", "interpreter.py"]
+CMD ["python", "interpreter.py"]
