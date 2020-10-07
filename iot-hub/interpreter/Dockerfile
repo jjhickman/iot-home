@@ -108,6 +108,6 @@ COPY . /interpreter
 RUN set -e; \
     touch /root/.bashrc; \
     echo "export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1" > /root/.bashrc
-
+EXPOSE 5672
 
 CMD ["python", "interpreter.py"]

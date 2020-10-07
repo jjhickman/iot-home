@@ -246,3 +246,5 @@ dist
 .pnp.*
 
 *tflite
+**/*log/*
+*.csv

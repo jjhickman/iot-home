@@ -25,7 +25,7 @@ const notify = (job, presignedUrl) => {
         if (!err) {
             log.debug(`Successfully notified SNS of ${snsParams}: ${data}`);
         } else {
-            log.error(`Failed to notify topic ${config.snsTopicArn} with parameters ${snsParams}: ${err}`)
+            log.error(`Failed to notify topic ${config.snsTopicArn} with parameters ${snsParams}: ${err}`);
         }
         axios.post(`${config.hubEndpoint}/notification`, {
                 message: snsParams.Message,
@@ -35,11 +35,11 @@ const notify = (job, presignedUrl) => {
             .then(res => {
               log.debug(`Hub ${config.hubEndpoint} status: ${res.statusCode}`);
               if (res.statusCode != 200) {
-                  log.error(`Hub ${config.hubEndpoint} returned with the following error status: ${res.statusCode}`)
+                  log.error(`Hub ${config.hubEndpoint} returned with the following error status: ${res.statusCode}`);
               }
             })
             .catch((err) => {
-                log.error(`Failed to notify hub of new notification with params ${snsParams}: ${err}`)
+                log.error(`Failed to notify hub of new notification with params ${snsParams}: ${err}`);
             });
     });
 };
@@ -67,7 +67,7 @@ const upload = (job) => {
                                 if (!err) {
                                    notify(job, url)
                                 } else {
-                                    log.error(`Error getting presigned url for ${s3Params.Key} in ${s3Params.Bucket}: ${err}`)
+                                    log.error(`Error getting presigned url for ${s3Params.Key} in ${s3Params.Bucket}: ${err}`);
                                     notify(job, url);
                                 }
                             });
@@ -91,7 +91,7 @@ const process = (msg) => {
     let job = JSON.parse(msg.content.toString());
     if (job.job_type && job.message && !job.message.includes('OKAY')) {
         if (job.file) {
-           upload(job)
+           upload(job);
         } else {
             notify(job, '');
         }

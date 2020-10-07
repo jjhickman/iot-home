@@ -1,0 +1,1 @@
+docker run --env AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID  --env AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY --env AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION --SNS_TOPIC_ARN=$SNS_TOPIC_ARN -p 8080:8080 -p 5672:5672 -v log:/notifier/log -d jjhickman/iot-home-notifier:latest

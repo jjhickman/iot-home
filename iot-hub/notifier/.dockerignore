@@ -1,4 +1,6 @@
 node_modules
+run.sh
 package-lock.json
 yarn.lock
 Dockerfile
+**/*log/*
