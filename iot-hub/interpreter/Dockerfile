@@ -1,40 +1,32 @@
-FROM arm64v8/ubuntu:focal AS builder
+FROM ubuntu AS builder
 WORKDIR /interpreter-builder
+
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+RUN echo 'Running on ${BUILDPLATFORM}, building for ${TARGETPLATFORM}}...'
 
 ARG OPENCV_VERSION=4.4.0
 ARG CPU_CORES=4
-ARG REPOSITORY=https://github.com/jjhickman/iot-home.git
 ENV OPENCV_VERSION=$OPENCV_VERSION
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Install build dependencies
-RUN set -e; \
-    apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential apt-utils cmake wget git pkg-config gfortran zip \
     unzip libjpeg-dev libtiff5-dev libavcodec-dev libavformat-dev \
-    libswscale-dev libgtk2.0-dev libxvidcore-dev libx264-dev libv4l-dev \
+    libswscale-dev libxvidcore-dev libx264-dev libv4l-dev \
+    #libswscale-dev libgtk2.0-dev libxvidcore-dev libx264-dev libv4l-dev \
     libatlas-base-dev python3-dev python2.7-dev v4l-utils curl \
     gstreamer1.0-plugins-base  gstreamer1.0-plugins-good qtbase5-dev \
-    qtdeclarative5-dev gnupg2 gnupg ; \
-    apt-get install -y --no-install-recommends python3-pip; \
-    pip3 install --upgrade pip && pip3 install numpy \
-    python-socketio async-timeout asyncio pika Pillow --no-cache-dir; \
+    gnupg2 gnupg python3-pip; \
+    #qtdeclarative5-dev gnupg2 gnupg python3-pip; \
+    pip3 install --upgrade pip && pip3 install numpy --no-cache-dir; \
     apt-get clean; \
-    apt-get -y autoremove; \
     rm -rf /var/lib/apt/lists/*;
 
-# Setup for Coral Edge TPU
-RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee --append /etc/apt/sources.list.d/coral-edgetpu.list; \
-    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - ; \
-    apt-get update ; \
-    apt-get install libedgetpu1-std -y --no-install-recommends; \
-    wget https://dl.google.com/coral/python/tflite_runtime-2.1.0.post1-cp38-cp38-linux_aarch64.whl; \
-    pip3 install tflite_runtime-2.1.0.post1-cp38-cp38-linux_aarch64.whl; \
-    rm tflite_runtime-2.1.0.post1-cp38-cp38-linux_aarch64.whl
-
 # Download OpenCV and module source
-RUN set -e; \
-    cd /tmp; \
+RUN cd /tmp; \
     wget -c -nv -O opencv.zip https://github.com/opencv/opencv/archive/$OPENCV_VERSION.zip; \
     unzip opencv.zip; \
     wget -c -nv -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/$OPENCV_VERSION.zip; \
@@ -47,11 +39,9 @@ RUN set -e; \
     cmake -D CMAKE_BUILD_TYPE=RELEASE \
         -D OPENCV_EXTRA_MODULES_PATH=/tmp/opencv_contrib/modules \
         -D CMAKE_INSTALL_PREFIX=/usr/local \
-        # Build with GUI support
-        -D WITH_QT=ON \
-        -D WITH_GTK=ON \
-        # Build without GPU support
-        -D WITH_OPENCL=ON \
+        -D WITH_QT=OFF \
+        -D WITH_GTK=OFF \
+        #-D WITH_OPENCL=ON \
         -D WITH_CUDA=OFF \
 	    -D OPENCV_GENERATE_PKGCONFIG=ON \
 	    -D BUILD_NEW_PYTHON_SUPPORT=ON \
@@ -64,8 +54,6 @@ RUN set -e; \
 	    -D BUILD_TBB=ON \
 	    -D OPENCV_EXTRA_EXE_LINKER_FLAGS=-latomic \
 	    -D WITH_EIGEN=OFF \
-        # Build with python
-        # Ignore all unnecessary stages
         -D BUILD_EXAMPLES=OFF \
         -D INSTALL_C_EXAMPLES=OFF \
         -D INSTALL_PYTHON_EXAMPLES=OFF \
@@ -73,41 +61,40 @@ RUN set -e; \
         -D BUILD_PERF_TESTS=OFF \
         -D BUILD_TESTS=OFF \
         .. ; \
-    make -j$CPU_CORES; \
+    make ; \
     make install; \
-    ldconfig; \
     rm -rf /tmp/*
 
-RUN apt-get purge -y build-essential apt-utils cmake wget git pkg-config gfortran zip \
-    unzip libjpeg-dev libtiff5-dev libavcodec-dev libavformat-dev \
-    libswscale-dev libgtk2.0-dev libxvidcore-dev libx264-dev libv4l-dev \
-    libatlas-base-dev python3-dev python2.7-dev v4l-utils curl \
-    gstreamer1.0-plugins-base  gstreamer1.0-plugins-good qtbase5-dev \
-    qtdeclarative5-dev gnupg2 gnupg 
+FROM python:3.8-slim
 
-#FROM arm64v8/alpine:latest
-FROM arm64v8/ubuntu:focal
+RUN echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | tee --append /etc/apt/sources.list.d/coral-edgetpu.list; \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add - ; \
+    apt-get update ; \
+    apt-get install libedgetpu1-std -y --no-install-recommends
 
-ENV JOB_TIMEOUT_SEC=30
-ENV RABBITMQ_HOST=localhost
-ENV INPUT_QUEUE=input
-ENV OUTPUT_QUEUE=output
-ENV MODELS_DIR=/interpreter/models
-ENV IMAGES_DIR=/interpreter/images
-ENV TOP_K_OBJECTS=10
-ENV OBJECT_THRESHOLD=0.4
-ENV LOG_DIR=/interpreter/log
-ENV LOG_LEVEL=INFO
+RUN if [ $TARGETLATFORM = 'linux/arm64' ] ; then \
+        wget https://github.com/google-coral/pycoral/releases/download/release-frogfish/tflite_runtime-2.5.0-cp38-cp38-linux_aarch64.whl; \
+        pip3 install tflite_runtime-2.5.0-cp38-cp38-linux_aarch64.whl; \
+        tflite_runtime-2.5.0-cp38-cp38-linux_aarch64.whl; \
+    elif [ $TARGETPLATFORM = 'linux/arm/v7' ] ; then \
+        wget https://github.com/google-coral/pycoral/releases/download/release-frogfish/tflite_runtime-2.5.0-cp38-cp38-linux_armv7l.whl; \
+        pip3 install tflite_runtime-2.5.0-cp38-cp38-linux_armv7l.whl; \
+        rm tflite_runtime-2.5.0-cp38-cp38-linux_armv7l.whl ; \
+    else \
+        wget  	https://github.com/google-coral/pycoral/releases/download/release-frogfish/tflite_runtime-2.5.0-cp38-cp38-linux_x86_64.whl; \
+        pip3 install tflite_runtime-2.5.0-cp38-cp38-linux_x86_64.whl; \
+        rm tflite_runtime-2.5.0-cp38-cp38-linux_x86_64.whl ; \
+    fi
 
-WORKDIR /interpreter
-COPY --from=builder /usr/local/ /usr/local/
-COPY --from=builder /bin/ /bin/
-COPY --from=builder /etc/ /etc/
-COPY --from=builder /lib/ /lib/
-COPY . /interpreter
-RUN set -e; \
-    touch /root/.bashrc; \
-    echo "export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1" > /root/.bashrc
-EXPOSE 5672
+COPY --from=builder /usr/local /usr/local
+RUN ldconfig /usr/local; \
+    useradd -ms /bin/bash interpreter; \
+    mkdir -p /home/interpreter/log
 
+WORKDIR /home/interpreter
+COPY . .
+RUN pip install -r requirements.txt; \
+    chown -R interpreter /home/interpreter
+
+USER interpreter
 CMD ["python", "interpreter.py"]
