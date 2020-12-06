@@ -1,0 +1,20 @@
+{
+  "staging": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-amplify975b91bda5034-staging-141307-authRole",
+      "UnauthRoleArn": "arn:aws:iam::498707537134:role/amplify-amplify975b91bda5034-staging-141307-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::498707537134:role/amplify-amplify975b91bda5034-staging-141307-authRole",
+      "Region": "us-east-1",
+      "DeploymentBucketName": "amplify-amplify975b91bda5034-staging-141307-deployment",
+      "UnauthRoleName": "amplify-amplify975b91bda5034-staging-141307-unauthRole",
+      "StackName": "amplify-amplify975b91bda5034-staging-141307",
+      "StackId": "arn:aws:cloudformation:us-east-1:498707537134:stack/amplify-amplify975b91bda5034-staging-141307/2a254100-37cd-11eb-9d39-12d7a78ee1f9",
+      "AmplifyAppId": "d3solcirucamh9"
+    },
+    "categories": {
+      "auth": {
+        "iothome": {}
+      }
+    }
+  }
+}
