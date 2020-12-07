@@ -1,19 +1,21 @@
 import React from 'react';
-import logo from './logo.svg';
+import { BrowserRouter as Router, Route, Link, Switch, Redirect } from 'react-router-dom';
+import PrivateRoute from './components/PrivateRoute'
 import './App.css';
-import { withAuthenticator, AmplifySignOut } from '@aws-amplify/ui-react'
 
-function App() {
+export default App = () => {
   return (
     <div className="App">
-      <header>
-        <img src={logo} className="App-logo" alt="logo" />
-        <h1>We now have Auth!</h1>
-      </header>
-      <AmplifySignOut />
+      <Router>
+        <NavBar />
+        <div className="container">
+          <Switch>
+            <Route path='/login' component={Login} />
+            <PrivateRoute authed={this.state.authed} path='/' exact component={Home} />
+          </Switch>
+        </div>
+      </Router>
     </div>
   );
 }
 
-
-export default withAuthenticator(App);

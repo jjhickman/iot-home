@@ -67,7 +67,6 @@ RUN set -e; \
         .. ; \
     	make -j$CPU_CORES; \
     	make install; \
-    	ldconfig; \
         rm -rf /tmp/*
 
 RUN apt-get purge -y build-essential apt-utils cmake wget git pkg-config gfortran unzip libjpeg-dev libtiff5-dev \
@@ -77,11 +76,9 @@ RUN apt-get purge -y build-essential apt-utils cmake wget git pkg-config gfortra
     python3-dev python2.7-dev; 
 
 FROM raspbian/stretch:latest
-WORKDIR /security-picam
+WORKDIR /security-cam
 COPY --from=builder /usr/local/ /usr/local/
-COPY --from=builder /bin/ /bin/
-COPY --from=builder /etc/ /etc/
-COPY --from=builder /lib/ /lib/
-COPY . /security-picam
+RUN ldconfig /usr/local
+COPY . .
 
-CMD ["python", "security-picam.py"]
+CMD ["python", "security-cam.py"]

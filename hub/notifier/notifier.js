@@ -100,9 +100,10 @@ const process = (msg) => {
     }
 };
 
+
+
 let connectionUrl = `amqp://${config.rabbitmqUser}:${config.rabbitmqUser}@${config.rabbitmqHost}`;
 log.debug(`Connecting to RabbitMQ: ${connectionUrl}`);
-
 let connection = rabbitmq.connect(connectionUrl);
 connection.then((conn) => {
         return conn.createChannel();
