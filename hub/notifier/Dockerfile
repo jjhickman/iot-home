@@ -1,14 +1,15 @@
-FROM node:stretch-slim
+FROM node:alpine
 
-WORKDIR /notifier
-COPY . /notifier
+RUN adduser -S notifier -G node; \
+    mkdir -p /home/notifier
 
+WORKDIR /home/notifier
+COPY package.json .
 RUN npm config set registry http://registry.npmjs.org/  \
     && npm install
 
-EXPOSE 5672
-EXPOSE 8080
-EXPOSE 80
-EXPOSE 443
+COPY . .
 
+RUN chown -R notifier /home/notifier
+USER notifier
 CMD ["npm", "start"]
