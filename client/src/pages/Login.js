@@ -4,8 +4,6 @@ import Avatar from '@material-ui/core/Avatar';
 import Button from '@material-ui/core/Button';
 import CssBaseline from '@material-ui/core/CssBaseline';
 import TextField from '@material-ui/core/TextField';
-import FormControlLabel from '@material-ui/core/FormControlLabel';
-import Checkbox from '@material-ui/core/Checkbox';
 import Link from '@material-ui/core/Link';
 import Box from '@material-ui/core/Box';
 import LockOutlinedIcon from '@material-ui/icons/LockOutlined';
@@ -35,7 +33,7 @@ const useStyles = makeStyles((theme) => ({
   },
   avatar: {
     margin: theme.spacing(1),
-    backgroundColor: theme.palette.secondary.main,
+    backgroundColor: theme.palette.primary.main,
   },
   form: {
     width: '100%', // Fix IE 11 issue.
@@ -46,18 +44,18 @@ const useStyles = makeStyles((theme) => ({
   }
 }));
 
-signIn = async (username, password) => {
+const Login = (props) => {
+  const classes = useStyles();
+  const [username, setUsername] = React.useState('');
+  const [password, setPassword] = React.useState('');
+
+  const signIn = async (username, password) => {
     try {
         const user = await Auth.signIn(username, password);
     } catch (error) {
         console.log(`Error signing in: ${error}`);
     }
-}
-
-export default Login = () => {
-  const classes = useStyles();
-  const [username, setUsername] = React.useState('');
-  const [password, setPassword] = React.useState('');
+  }
 
   return (
     <Container component="main" maxWidth="xs">
@@ -96,17 +94,13 @@ export default Login = () => {
             value={password}
             onChange={e => setPassword(e.target.value)}
           />
-          <FormControlLabel
-            control={<Checkbox value="remember" color="primary" />}
-            label="Remember me"
-          />
           <Button
             type="submit"
             fullWidth
             variant="contained"
             color="primary"
             className={classes.submit}
-            onClick={() => signIn(username, password)}
+            onClick={e => {e.preventDefault(); signIn(username, password)}}
           >
             Sign In
           </Button>
@@ -118,3 +112,5 @@ export default Login = () => {
     </Container>
   );
 }
+
+export default Login;
