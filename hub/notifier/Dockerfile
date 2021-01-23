@@ -1,15 +1,10 @@
 FROM node:alpine
 
-RUN adduser -S notifier -G node; \
-    mkdir -p /home/notifier
-
-WORKDIR /home/notifier
+WORKDIR /notifier
 COPY package.json .
 RUN npm config set registry http://registry.npmjs.org/  \
-    && npm install
+    && npm install --production
 
 COPY . .
 
-RUN chown -R notifier /home/notifier
-USER notifier
 CMD ["npm", "start"]
