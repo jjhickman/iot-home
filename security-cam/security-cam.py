@@ -148,19 +148,13 @@ def disconnect(sid):
 def initialize():
     global sio, stream_url
 
-    wifi_address =  ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
+    address =  ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
 
     args = Variables()
 
     log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
     logger = logging.getLogger('security-picam')
     logger.setLevel(args.log_level)
-
-    if os.path.isdir(os.path.dirname(args.log_dir)) == False:
-        os.makedirs(os.path.dirname(args.log_dir), exist_ok = True)
-    file_handler = logging.RotatingFileHandler(os.path.join(args.log_dir, '{}.log'.format(socket.gethostname())), maxBytes=5000000, backupCount=10)
-    file_handler.setFormatter(log_formatter)
-    logger.addHandler(file_handler)
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_formatter)
     logger.addHandler(console_handler)
@@ -168,7 +162,7 @@ def initialize():
     app = web.Application()
     app['config'] = args
     
-    stream_url = 'http://{}:{}'.format(wifi_address, app['config'].stream_port)
+    stream_url = 'http://{}:{}'.format(address, app['config'].stream_port)
 
     sio.attach(app)
     app['socket'] = sio
@@ -182,7 +176,7 @@ def initialize():
     setup_middlewares(app)
     app.on_startup.append(start_tasks)
     app.on_cleanup.append(cleanup_tasks)
-    return app, wifi_address
+    return app, address
 
 async def start_tasks(app):
     app['capture'] = cv2.VideoCapture(0)
@@ -195,5 +189,5 @@ async def cleanup_tasks(app):
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    app, wifi_address = initialize()
-    web.run_app(app, host=wifi_address, port=app['config'].stream_port)
+    app, address = initialize()
+    web.run_app(app, host=address, port=app['config'].stream_port)

@@ -23,7 +23,7 @@ class Variables:
         
         self.hub_url = os.getenv('HUB_REST_ENDPOINT')
         if self.hub_url == None:
-            self.hub_url = 'http://localhost:8881'
+            self.hub_url = 'http://localhost:8080'
 
         self.cooldown_seconds = os.getenv('COOLDOWN_SECONDS')
         if self.cooldown_seconds == None:
@@ -40,7 +40,3 @@ class Variables:
             self.log_level = logging.ERROR
         else:
             self.log_level = logging.DEBUG
-
-        self.log_dir = os.getenv('LOG_DIR')
-        if self.log_dir == None:
-            self.log_dir = './log'
