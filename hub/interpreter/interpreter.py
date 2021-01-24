@@ -1,111 +1,56 @@
-import pika
-import sys
-import os
-from variables import Variables
-import datetime
+
 import argparse
-import logging
-import logging.handlers
-import socket
+import cv2
+import pika
 import socketio
-import collections
-import math
 import async_timeout
 import asyncio
+from PIL import Image
 from io import BytesIO
 import base64
-import common
-import cv2
-import socketio
-import numpy as np
+import os
 import json
+import datetime
 import time
-import re
-from PIL import Image
+import helper
+from pycoral.adapters.detect import get_objects
+from pycoral.utils.edgetpu import run_inference
 
-JOBS = {
-    'person_detection': {
-        'model': 'mobilenet_ssd_v2_face_quant_postprocess_edgetpu.tflite'
-    }
-}
-
-ConnectTime = time.time()
-Interpreter = None
-Result = {}
-Object = collections.namedtuple('Object', ['id', 'score', 'bbox'])
 sio = None
-class BBox(collections.namedtuple('BBox', ['xmin', 'ymin', 'xmax', 'ymax'])):
-    """Bounding box.
-    Represents a rectangle which sides are either vertical or horizontal, parallel
-    to the x or y axis.
-    """
-    __slots__ = ()
+result = {}
+logger = None
 
-def get_output(interpreter, score_threshold, top_k, image_scale=1.0):
-    """Returns list of detected objects."""
-    boxes = common.output_tensor(interpreter, 0)
-    class_ids = common.output_tensor(interpreter, 1)
-    scores = common.output_tensor(interpreter, 2)
-    count = int(common.output_tensor(interpreter, 3))
-
-    def make(i):
-        ymin, xmin, ymax, xmax = boxes[i]
-        return Object(
-            id=int(class_ids[i]),
-            score=scores[i],
-            bbox=BBox(xmin=np.maximum(0.0, xmin),
-                      ymin=np.maximum(0.0, ymin),
-                      xmax=np.minimum(1.0, xmax),
-                      ymax=np.minimum(1.0, ymax)))
-
-    return [make(i) for i in range(top_k) if scores[i] >= score_threshold]
-
-def load_job(config, job):
-    try:
-        data = json.loads(job)
-        source = data['source']
-        job_type = data['job_type']
-        logger.debug('Loading job for {} doing {}'.format(data['source'], data['job_type']))
-        job_interpreter = common.make_interpreter(os.path.join(config.models , JOBS[job_type]['model']))
-        job_interpreter.allocate_tensors()
-        logger.debug('Loading job of type: {} with model {} using source {}'.format(job_type, JOBS[job_type]['model'], source))
-        return job_type, job_interpreter, source
-    except ValueError as e:
-        logger.error('Failed parsing job: {}'.format(e))
-        return '', None, ''
-    except KeyError as e:
-        logger.error('Failed parsing job: {}'.format(e))
-        return '', None, ''
-
-def process_webstream(config, source):
-    global Result
-    Result = {}
+def process_webstream(args, interpreter, inference_size, source):
+    global result,sio, logger
+    result = {}
     sio = socketio.Client()
     try:
-        with async_timeout(config.job_timeout):
+        with async_timeout(args.job_timeout):
             @sio.event
             async def connect():
+                global logger
                 logger.debug('Connected at {}! Processing stream...'.format(datetime.datetime.now()))
     
             @sio.event
             async def connect_error():
+                global logger
                 logger.error("The connection failed!")
 
             @sio.on('image')
             async def on_image(message):
-                global Interpreter, Result
+                global result, sio, logger
                 try:
-                    image = Image.open(BytesIO(base64.b64decode(message['data'])))
-                    common.set_input(Interpreter, image)
+                    #image = Image.open(BytesIO(base64.b64decode(message['data'])))
+                    image = BytesIO(base64.b64decode(message['data']))
                     start = time.time()
-                    await Interpreter.invoke()
-                    end = time.time()
-                    logger.debug('Interpreted image in {} ms'.format(1000*(end - start)))
-                    objects = get_output(Interpreter, score_threshold=config.threshold, top_k=config.top_k)
+                    run_inference(interpreter, image)
+                    logger.debug('Interpreted image in {} ms'.format(1000*(time.time() - start)))
+                    objects = get_objects(interpreter, args.threshold)[:args.top_k]
+                    image = helper.append_objs_to_img(cv2_im, inference_size, objs, labels)
                     if len(objects) > 0:
                         logger.info('Person detected!')
-                        filepath = os.path.join(config.images, '{}.jpg'.format(datetime.datetime.now()))
-                        Result = {
+                        filepath = os.path.join(args.output_dir, '{}.jpg'.format(datetime.datetime.now()))
+                        result = {
                             'job_type': 'person_detection',
                             'message': 'FOUND',
                             'file': filepath
@@ -114,7 +59,7 @@ def process_webstream(config, source):
                         await sio.disconnect()
                 except Exception as e:
                     logger.debug('Error parsing message from socketio server: {}'.format(e))
-                    Result = {
+                    result = {
                         'job_type': 'person_detection',
                         'message': 'INTERPRETER_ERROR: {}'.format(e)
                     }
@@ -123,65 +68,73 @@ def process_webstream(config, source):
             sio.connect(source)
     except asyncio.TimeoutError as e:
         logger.debug('Disconnecting. Job expired: {}'.format(e))
-        Result = {
+        result = {
             'job_type': 'person_detection',
             'message': 'TIMEOUT: {}'.format(e)
         }
         sio.disconnect()
     except Exception as e:
         logger.error('Exception processing stream: {}'.format(e))
-        Result = {
+        result = {
             'job_type': 'person_detection',
             'message': 'EXCEPTION: {}'.format(e)
         }
-    return Result
+    return result
 
-def run(config, channel):
-    global Interpreter
-    for method_frame, _, body in channel.consume(config.input_queue):
+def run(args, channel, logger):
+    interpreter, inference_size = helper.load_interpreter(os.path.join(args.model_dir, args.default_model), os.path.join(args.model_dir, args.default_labels))
+    job_type = args.default_job_type
+    for method_frame, _, body in channel.consume(args.input_queue):
         logger.info('New RabbitMQ message: {}'.format(body))
         try:
-            job_type, Interpreter, source = load_job(config, body)
+            job_type, interpreter, inference_size, source = load_job(args, current_job_type, interpreter, body)
             if job_type == 'person_detection':
-                result = process_webstream(config, source)
+                result = process_webstream(args, interpreter, inference_size, source)
                 channel.basic_publish(exchange='',
-                    routing_key=config.output_queue,
+                    routing_key=args.output_queue,
                     body=json.dumps(result))
             channel.basic_ack(method_frame.delivery_tag)
         except pika.exceptions.ConnectionClosed as e:
             logger.error('Error notifying job complete: {}'.format(e))
             return
 
-if __name__ == '__main__':
+def main():
+    parser = argparse.ArgumentParser(description="Coral TPU camera stream interpreter service")
+    parser.add_argument('--model_dir', help='.tflite model path',
+                        default='./models/')
+    parser.add_argument('--default_labels', help='label file path',
+                        default='./models/coco_labels.txt')
+    parser.add_argument('--default_model', help='label file path',
+                        default='./models/mobilenet_ssd_v2_face_quant_postprocess_edgetpu.tflite')
+    parser.add_argument('--default_job_type', help='default job type run on startup',
+                        default='person_detection')
+    parser.add_argument('--top_k', type=int, default=3,
+                        help='number of categories with highest score to display')
+    parser.add_argument('--threshold', type=float, default=0.4,
+                        help='confidence score threshold')
+    parser.add_argument('--input_queue', type=str, default="interpreter",
+                        help='input job queue for interpreter')
+    parser.add_argument('--output_queue', type=str, default="notifier",
+                        help='output job queue for interpreter')
+    parser.add_argument('--job_timeout', type=int, default=30,
+                        help='how long until job runs out of time in seconds')
+    parser.add_argument('--output_dir', type=str, default="./output",
+                        help='output desitnation for interpreter completed jobs')
+    args = parser.parse_args()
 
-    config = Variables()
-    log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
-    logger = logging.getLogger('interpreter')
-    logger.setLevel(config.log_level)
-    if os.path.isdir(os.path.dirname(config.log_dir)) == False:
-        os.makedirs(os.path.dirname(config.log_dir), exist_ok = True)
-    
-    file_handler = logging.handlers.RotatingFileHandler(os.path.join(config.log_dir, '{}.log'.format(socket.gethostname())), maxBytes=5000000, backupCount=10)
-    file_handler.setFormatter(log_formatter)
-    logger.addHandler(file_handler)
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(log_formatter)
-    logger.addHandler(console_handler)
+    logger = load_logger(logging.DEBUG)
 
-    if os.path.isdir(config.images) == False:
-        os.makedirs(config.images, exist_ok = True)
+    if os.path.isdir(args.output_dir) == False:
+        os.makedirs(args.output_dir, exist_ok = True)
 
     try:
-        credentials = pika.PlainCredentials(config.rabbitmq_user, config.rabbitmq_password)
-        parameters = pika.ConnectionParameters(host=config.rabbitmq_host, credentials=credentials)
-        connection = pika.BlockingConnection(parameters)
-        channel = connection.channel()
-        channel.basic_qos(prefetch_count=1) # tell RabbitMQ not to give more than one message at a time
-
-        run(config, channel) # main service loop
-
+        connection, channel = load_rabbitmq(args)
+        run(args, channel, logger)
         requeued_messages = channel.cancel()
         logger.info('Requeued %i messages' % requeued_messages)
         connection.close()
     except pika.exceptions.AMQPConnectionError as e:
         logger.error('Error connecting to RabbitMQ service: {}. Exiting...'.format(e))
+
+if __name__ == '__main__':
+    main()
