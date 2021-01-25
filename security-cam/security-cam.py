@@ -39,7 +39,7 @@ async def index(request):
         <body>
         <h1>""" + socket.gethostname() + """</h1>
         <img id='image' src=''/>
-        <script src='https://cdnjs.cloudflare.com/ajax/libs/socket.io/1.7.4/socket.io.js'></script>
+        <script src="https://cdn.socket.io/socket.io-3.0.1.min.js"></script>
         <script>
             const socket = io.connect('""" + stream_url + """');
             socket.on('image', (image) => {
@@ -121,7 +121,6 @@ async def monitor(app):
     while True:
         await asyncio.sleep(0.05)
         if GPIO.input(pin) > 0:
-            logger.debug('Motion detected: {}'.format(pin))
             await on_motion(app)
 
 """
