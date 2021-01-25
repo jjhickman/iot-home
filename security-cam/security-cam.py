@@ -54,7 +54,7 @@ async def index(request):
 
 # POST request handler for Hub notifications to ignore motion for a specified amount of time
 async def sleep(request):
-    global awake_timem, logger
+    global awake_time, logger
     sleep_seconds = int(request.match_info.get('sleep_seconds', "1800"))
     if sleep_seconds > 0:
         awake_time = time.time() + sleep_seconds
