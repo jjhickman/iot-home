@@ -25,7 +25,7 @@ awake_time = -1
 cooldown_time = -1
 stream_url = ''
 sio = socketio.AsyncServer()
-
+logger = None
 """
 =============================================================================
     REST API routes
@@ -33,6 +33,7 @@ sio = socketio.AsyncServer()
 """
 # GET request handler for stream
 async def index(request):
+    global logger
     index_html = """<html>
     <head><title>""" + socket.gethostname() + """</title></head>
         <body>
@@ -53,7 +54,7 @@ async def index(request):
 
 # POST request handler for Hub notifications to ignore motion for a specified amount of time
 async def sleep(request):
-    global awake_time
+    global awake_timem, logger
     sleep_seconds = int(request.match_info.get('sleep_seconds', "1800"))
     if sleep_seconds > 0:
         awake_time = time.time() + sleep_seconds
@@ -78,7 +79,7 @@ async def notify_hub(app, session):
         return 500, err
 
 async def on_motion(app):
-    global awake_time, cooldown_time
+    global awake_time, cooldown_time, logger
     epoch_time = time.time()
     if epoch_time > cooldown_time and epoch_time > awake_time:
         logger.info('Notifying hub at {}'.format(app['config'].hub_url))
@@ -96,6 +97,7 @@ async def on_motion(app):
 =============================================================================
 """
 async def stream(app):
+    global logger
     refresh_ms = 1.0 / int(app['config'].stream_fps)
     logger.debug('Updating stream every {} ms'.format(refresh_ms))
     try:
@@ -114,6 +116,7 @@ async def stream(app):
 
 
 async def monitor(app):
+    global logger
     pin = app['gpio_pin']
     while True:
         await asyncio.sleep(0.05)
@@ -146,7 +149,7 @@ def disconnect(sid):
 =============================================================================
 """
 def initialize():
-    global sio, stream_url
+    global sio, stream_url, logger
 
     address =  ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
 
