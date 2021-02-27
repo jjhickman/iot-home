@@ -45,4 +45,4 @@ class Variables:
 
         self.address = os.getenv("CAM_IP_ADDRESS")
         if self.address == None:
-            self.address = "127.0.0.1"#get_ip_address('wlan0')
+            self.address = get_ip_address('wlan0')
