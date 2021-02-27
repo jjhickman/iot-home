@@ -10,7 +10,7 @@ const notify = (job, presignedUrl) => {
     let sns = new aws.SNS();
     let snsParams = {
         Message: `${job.message} - investigate: ${presignedUrl}`,
-        Subject: job.job_type,
+        Subject: `Potential intruder`,
         TargetArn: config.snsTopicArn
     }
     sns.publish(snsParams, (err, data) => {
@@ -30,7 +30,7 @@ const upload = (job) => {
                     let s3 = new aws.S3();
                     let s3Params = {
                         Bucket: config.s3Bucket,
-                        Key: path.join(job.job_type, path.basename(job.file)),
+                        Key: path.join('security', path.basename(job.file)),
                         Body: data
                     }
                     s3.upload(s3Params, (err, data) => {
@@ -38,7 +38,7 @@ const upload = (job) => {
                             console.log(`Succesfully uploaded ${job.file}: ${data}`);
                             s3Params = {
                                 Bucket: config.s3Bucket,
-                                Key: path.join(job.job_type, path.basename(job.file)),
+                                Key: path.join('security', path.basename(job.file)),
                                 Expires: 86400
                             }
                             s3.getSignedUrl('getObject', s3Params, (err, url) => {
@@ -67,7 +67,7 @@ const upload = (job) => {
 
 const process = (msg) => {
     let job = JSON.parse(msg.content.toString());
-    if (job.job_type && job.message && !job.message.includes('OKAY')) {
+    if (job.message && !job.message.includes('OKAY')) {
         if (job.file) {
            upload(job);
         } else {
