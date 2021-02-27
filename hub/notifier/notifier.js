@@ -4,7 +4,6 @@ const rabbitmq = require('amqplib');
 const aws = require('aws-sdk');
 const path = require('path');
 const fs = require('fs');
-const axios = require('axios');
 
 let config = new variables();
 const notify = (job, presignedUrl) => {

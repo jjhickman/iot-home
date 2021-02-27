@@ -1,6 +1,6 @@
 {
   "name": "notifier",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "",
   "main": "notifier.js",
   "scripts": {
@@ -8,9 +8,6 @@
   },
   "dependencies": {
     "amqplib": "^0.6.0",
-    "aws-sdk": "^2.766.0",
-    "axios": "^0.20.0",
-    "winston": "^3.3.3",
-    "winston-daily-rotate-file": "^4.5.0"
+    "aws-sdk": "^2.766.0"
   }
 }
