@@ -1,4 +1,4 @@
-FROM jjhickman/opencv-python AS builder
+FROM jjhickman/opencv-python:headless AS builder
 ARG TARGETPLATFORM
 ENV PLATFORM=${TARGETPLATFORM}
 
@@ -22,6 +22,6 @@ RUN ldconfig /usr/local/lib; \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip3 install -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 COPY . .
 CMD ["python3", "security-cam.py"]

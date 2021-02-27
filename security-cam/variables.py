@@ -1,13 +1,21 @@
 import os
 import logging
+import socket
+import fcntl
+import struct
+
+def get_ip_address(ifname):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    address = socket.inet_ntoa(fcntl.ioctl(
+        s.fileno(),
+        0x8915,  # SIOCGIFADDR
+        struct.pack('256s', bytes(ifname[:15], 'utf-8'))
+    )[20:24])
+    s.close()
+    return address
 
 class Variables:
     def __init__(self):
-        self.gpio_pin = os.getenv('IR_GPIO_PIN')
-        if self.gpio_pin == None:
-            self.gpio_pin = 23
-        else:
-            self.gpio_pin = int(self.gpio_pin)
 
         self.stream_port = os.getenv('STREAM_PORT')
         if self.stream_port == None:
@@ -17,7 +25,7 @@ class Variables:
 
         self.stream_fps = os.getenv('STREAM_FPS')
         if self.stream_fps == None:
-            self.stream_fps = 24
+            self.stream_fps = 30
         else:
             self.stream_fps = int(self.stream_fps)
         
@@ -25,18 +33,16 @@ class Variables:
         if self.hub_url == None:
             self.hub_url = 'http://localhost:8080'
 
-        self.cooldown_seconds = os.getenv('COOLDOWN_SECONDS')
-        if self.cooldown_seconds == None:
-            self.cooldown_seconds = 3000
+        self.threshold = os.getenv('THRESHOLD')
+        if self.threshold == None:
+            self.threshold = 30
         else:
-            self.cooldown_seconds = int(self.cooldown_seconds)
+            self.threshold = int(self.threshold)
 
-        self.log_level = os.getenv('LOG_LEVEL')
-        if self.log_level == None:
-            self.log_level = logging.DEBUG
-        elif self.log_level == 'INFO':
-            self.log_level = logging.INFO
-        elif self.log_level == 'ERROR':
-            self.log_level = logging.ERROR
-        else:
-            self.log_level = logging.DEBUG
+        self.certificate = os.getenv("HUB_CERTIFICATE")
+        if self.certificate == None:
+            self.certificate = '/run/secrets/ca.crt'
+
+        self.address = os.getenv("CAM_IP_ADDRESS")
+        if self.address == None:
+            self.address = "127.0.0.1"#get_ip_address('wlan0')

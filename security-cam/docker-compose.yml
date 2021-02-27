@@ -1,19 +1,17 @@
 version: "3.4"
 services:
-  proxy:
-    image: jjhickman/iot-home:security-cam
+  security-cam:
+    build: .
     container_name: security-cam
     restart: unless-stopped
     devices:
       - /dev/video0
       - /dev/vchiq
-      - /dev/gpiomem
-    volumes:
-      - /opt/vc:/opt/vc
+#    volumes:
+#      - /opt/vc:/opt/vc
     network_mode: host
     environment:
-      - IR_GPIO_PIN=3
       - STREAM_PORT=3333
       - STREAM_FPS=30
       - HUB_REST_ENDPOINT=http://192.168.50.166:8080
-      - COOLDOWN_SECONDS=30
+      - THRESHOLD=30

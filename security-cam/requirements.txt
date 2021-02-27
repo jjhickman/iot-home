@@ -1,6 +1,4 @@
-RPi.GPIO
-python-socketio
-asyncio
-async-timeout
+python-socketio==5.0.4
 aiohttp
-netifaces
+async-timeout
+asyncio

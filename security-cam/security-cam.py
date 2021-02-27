@@ -1,31 +1,29 @@
 import time
 import sys
 import os
+import ssl
 from variables import Variables
 import argparse
 import socket
 import asyncio
 import socketio
-import netifaces as ni
-import async_timeout
 import cv2
 import base64
 import datetime
 import functools
 import logging
 import pathlib
-import RPi.GPIO as GPIO
 import json
 import aiohttp
 from aiohttp import web
 from middleware import setup_middlewares
-http_logger = logging.getLogger('aiohttp.server')
 
 awake_time = -1
-cooldown_time = -1
 stream_url = ''
 sio = socketio.AsyncServer()
 logger = None
+static_back = None
+
 """
 =============================================================================
     REST API routes
@@ -39,10 +37,12 @@ async def index(request):
         <body>
         <h1>""" + socket.gethostname() + """</h1>
         <img id='image' src=''/>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.1.0/socket.io.js"></script>
+        <script src="https://cdn.socket.io/3.1.1/socket.io.min.js" integrity="sha384-gDaozqUvc4HTgo8iZjwth73C6dDDeOJsAgpxBcMpZYztUfjHXpzrpdrHRdVp8ySO" crossorigin="anonymous"></script>
         <script>
             const socket = io.connect('""" + stream_url + """');
+            console.log("Connection started")
             socket.on('image', (image) => {
+                console.log("New image!");
                 let imageStr = new TextDecoder("utf-8").decode(image);
                 document.getElementById('image').src = 'data:image/jpeg;base64,' + imageStr;
             });
@@ -52,44 +52,29 @@ async def index(request):
     logger.debug('Request for stream: {}\n\nSending: {}'.format(request, index_html))
     return web.Response(text=index_html, content_type='text/html')
 
-# POST request handler for Hub notifications to ignore motion for a specified amount of time
-async def sleep(request):
-    global awake_time, logger
-    sleep_seconds = int(request.match_info.get('sleep_seconds', "1800"))
-    if sleep_seconds > 0:
-        awake_time = time.time() + sleep_seconds
-        update = 'Sleeping for {} seconds, waking at {}'.format(sleep_seconds, time.ctime(awake_time))
-        logger.debug(update)
-        return web.Response(text=update)
-    return web.Response(status=404, text='Invalid number of seconds in request: {}'.format(sleep_seconds))
+def motion_found(threshold, frame):
+    global static_back
+    motion = False
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) 
+    gray = cv2.GaussianBlur(gray, (21, 21), 0) 
+  
+    if static_back is None: 
+        static_back = gray 
+        return motion
+  
+    diff_frame = cv2.absdiff(static_back, gray) 
+    thresh_frame = cv2.threshold(diff_frame, threshold, 255, cv2.THRESH_BINARY)[1] 
+    thresh_frame = cv2.dilate(thresh_frame, None, iterations = 2) 
+    cnts,_ = cv2.findContours(thresh_frame.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE) 
+  
+    for contour in cnts: 
+        if cv2.contourArea(contour) < 10000: 
+            continue
+        motion = True
+  
+        (x, y, w, h) = cv2.boundingRect(contour) 
+    return motion
 
-
-"""
-=============================================================================
-    Motion detection via infrared GPIO and notification for hub
-=============================================================================
-"""
-async def notify_hub(app, session):
-    global stream_url
-    try:
-        with async_timeout.timeout(5):
-            async with session.post(app['config'].hub_url, data=stream_url) as response:
-                return await response.status, response.text()
-    except Exception as err:
-        return 500, err
-
-async def on_motion(app):
-    global awake_time, cooldown_time, logger
-    epoch_time = time.time()
-    if epoch_time > cooldown_time and epoch_time > awake_time:
-        logger.info('Notifying hub at {}'.format(app['config'].hub_url))
-        cooldown_time = epoch_time + int(app['config'].cooldown_seconds)
-        async with aiohttp.ClientSession() as session:
-            status, response = await notify_hub(app, session)
-            if status != 200:
-                logger.error('Failed notifying hub of motion detected! Code: {} Response: {}'.format(status, response))
-            else:
-                logger.info('Successfully notified hub of motion detected')
 
 """
 =============================================================================
@@ -97,31 +82,48 @@ async def on_motion(app):
 =============================================================================
 """
 async def stream(app):
-    global logger
-    refresh_ms = 1.0 / int(app['config'].stream_fps)
-    logger.debug('Updating stream every {} ms'.format(refresh_ms))
+    global logger, stream_url, awake_time
+    refresh_seconds = 1.0 / int(app['config'].stream_fps)
+    logger.debug('Updating stream every {} seconds'.format(refresh_seconds))
     try:
         while True:
             ret, frame = app['capture'].read()
             if ret == False:
-                http_logger.info("FAILED READING FROM CAPTURE")
+                logger.info("FAILED READING FROM CAPTURE")
                 break
+            logger.debug("NEW FRAME")
             ret, jpg_image = cv2.imencode('.jpg', frame)
             base64_image = base64.b64encode(jpg_image)
             await app['socket'].emit('image', base64_image)
-            await asyncio.sleep(refresh_ms)
+
+            logger.debug("EMITTED FRAME")
+            await asyncio.sleep(refresh_seconds)
+            awake = awake_time == -1 or time.time() >= awake_time
+            if awake and motion_found(int(app['config'].threshold), frame):
+                sslcontext = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=app['config'].certificate)
+                timeout = aiohttp.ClientTimeout(total=10)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    try:
+                        async with session.post(app['config'].hub_url, timeout=timeout, ssl=sslcontext, json={'source': stream_url, 'time': round(time.time() * 1000)}) as response:
+                            status = await response.status()
+                            data = await response.json()
+                            if status != 200:
+                                logger.error("Status: " + str(status) + " - sleeping for default 60 seconds...")
+                                awake_time = time.time() + 60
+                            else:
+                                data = await response.json()
+                                if data['sleep_seconds'] and int(data['sleep_seconds']) > 0:
+                                    awake_time = time.time() + int(data['sleep_seconds'])
+                                    logger.info("Sleeping for " + str(data['sleep_seconds']) + " seconds...")
+                                else:
+                                    awake_time = time.time() + int(data['sleep_seconds'])
+                                    logger.error("No sleep_seconds field in JSON response. Sleeping for default 60 seconds...")
+                    except aiohttp.ClientError as e:
+                        logger.error(str(e))
+                        awake_time = time.time() + 60
         logger.debug('Ended stream!')
     except asyncio.CancelledError:
         logger.debug('Stream cancelled')
-
-
-async def monitor(app):
-    global logger
-    pin = app['gpio_pin']
-    while True:
-        await asyncio.sleep(0.05)
-        if GPIO.input(pin) > 0:
-            await on_motion(app)
 
 """
 =============================================================================
@@ -130,16 +132,16 @@ async def monitor(app):
 """
 @sio.on('finished')
 async def handle_finish(sid, data):
-    print('Client {} finished job. Disconnecting...'.format(sid))
+    logger.info('Client {} finished job. Disconnecting...'.format(sid))
     await sio.disconnect(sid)
 
 @sio.event
 async def connect(sid, environ):
-    print('CONNECTED to client with id: {}'.format(sid))
+    logger.info('CONNECTED to client with id: {}'.format(sid))
 
 @sio.event
 def disconnect(sid):
-    print('DISCONNECTED from client with id: {}'.format(sid))
+    logger.info('DISCONNECTED from client with id: {}'.format(sid))
 
 
 """
@@ -150,13 +152,11 @@ def disconnect(sid):
 def initialize():
     global sio, stream_url, logger
 
-    address =  ni.ifaddresses('wlan0')[ni.AF_INET][0]['addr']
-
     args = Variables()
 
     log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
-    logger = logging.getLogger('security-picam')
-    logger.setLevel(args.log_level)
+    logger = logging.getLogger('aiohttp.server')
+    logger.setLevel(logging.DEBUG)
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_formatter)
     logger.addHandler(console_handler)
@@ -164,30 +164,23 @@ def initialize():
     app = web.Application()
     app['config'] = args
     
-    stream_url = 'http://{}:{}'.format(address, app['config'].stream_port)
+    stream_url = 'http://{}:{}'.format(app['config'].address, app['config'].stream_port)
 
     sio.attach(app)
     app['socket'] = sio
 
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(int(app['config'].gpio_pin), GPIO.IN)
-    app['gpio_pin'] = app['config'].gpio_pin
-
     app.router.add_get('/', index)
-    app.router.add_post('/sleep/{sleep_seconds}', sleep)
     setup_middlewares(app)
     app.on_startup.append(start_tasks)
     app.on_cleanup.append(cleanup_tasks)
-    return app, address
+    return app, app['config'].address
 
 async def start_tasks(app):
     app['capture'] = cv2.VideoCapture(0)
     app['stream'] = app.loop.create_task(stream(app))
-    app['gpio'] = app.loop.create_task(monitor(app))
 
 async def cleanup_tasks(app):
     app['capture'].release()
-    GPIO.cleanup()
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
