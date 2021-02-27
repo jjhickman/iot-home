@@ -7,10 +7,7 @@ class Variables {
         this.rabbitmqQueue = process.env.RABBITMQ_QUEUE || 'output';
         this.snsTopicArn = process.env.SNS_TOPIC_ARN || '';
         this.s3Bucket = process.env.S3_BUCKET || 'jjhickman-iot-home';
-        this.logDirectory = process.env.LOG_DIR || './log';
-        this.logLevel = process.env.LOG_LEVEL || 'debug';
         this.hubEndpoint = process.env.HUB_REST_ENDPOINT || 'localhost:8080';
-        this.awsRegion = process.env.AWS_DEFAULT_REGION || 'us-east-1';
     }
 }
 
