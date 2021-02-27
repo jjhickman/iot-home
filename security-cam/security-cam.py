@@ -3,7 +3,6 @@ import sys
 import os
 import ssl
 from variables import Variables
-import argparse
 import socket
 import asyncio
 import socketio
@@ -42,7 +41,6 @@ async def index(request):
             const socket = io.connect('""" + stream_url + """');
             console.log("Connection started")
             socket.on('image', (image) => {
-                console.log("New image!");
                 let imageStr = new TextDecoder("utf-8").decode(image);
                 document.getElementById('image').src = 'data:image/jpeg;base64,' + imageStr;
             });

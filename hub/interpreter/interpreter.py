@@ -1,11 +1,9 @@
-
-import argparse
 import cv2
 import pika
 import socketio
 import async_timeout
 import asyncio
-from PIL import Image
+#from PIL import Image
 from io import BytesIO
 import base64
 import os
@@ -13,6 +11,8 @@ import json
 import datetime
 import time
 import helper
+import logging
+from variables import Variables
 from pycoral.adapters.detect import get_objects
 from pycoral.utils.edgetpu import run_inference
 
@@ -20,12 +20,15 @@ sio = None
 result = {}
 logger = None
 
-def process_webstream(args, interpreter, inference_size, source):
+TOP_K = 5
+THRESHOLD = 0.5
+
+def process_webstream(timeout_seconds, interpreter, inference_size, source):
     global result,sio, logger
     result = {}
     sio = socketio.Client()
     try:
-        with async_timeout(args.job_timeout):
+        with async_timeout(timeout_seconds):
             @sio.event
             async def connect():
                 global logger
@@ -38,21 +41,20 @@ def process_webstream(args, interpreter, inference_size, source):
 
             @sio.on('image')
             async def on_image(message):
-                global result, sio, logger
+                global result, sio, logger, TOP_K, THRESHOLD
                 try:
                     #image = Image.open(BytesIO(base64.b64decode(message['data'])))
                     image = BytesIO(base64.b64decode(message['data']))
                     start = time.time()
                     run_inference(interpreter, image)
                     logger.debug('Interpreted image in {} ms'.format(1000*(time.time() - start)))
-                    objects = get_objects(interpreter, args.threshold)[:args.top_k]
+                    objects = get_objects(interpreter, THRESHOLD)[:TOP_K]
                     image = helper.append_objs_to_img(cv2_im, inference_size, objs, labels)
                     if len(objects) > 0:
                         logger.info('Person detected!')
                         filepath = os.path.join(args.output_dir, '{}.jpg'.format(datetime.datetime.now()))
                         result = {
-                            'job_type': 'person_detection',
-                            'message': 'FOUND',
+                            'message': 'INTRUDER FOUND',
                             'file': filepath
                         }
                         await image.save(filepath)
@@ -60,7 +62,6 @@ def process_webstream(args, interpreter, inference_size, source):
                 except Exception as e:
                     logger.debug('Error parsing message from socketio server: {}'.format(e))
                     result = {
-                        'job_type': 'person_detection',
                         'message': 'INTERPRETER_ERROR: {}'.format(e)
                     }
                     await sio.disconnect()
@@ -69,72 +70,59 @@ def process_webstream(args, interpreter, inference_size, source):
     except asyncio.TimeoutError as e:
         logger.debug('Disconnecting. Job expired: {}'.format(e))
         result = {
-            'job_type': 'person_detection',
-            'message': 'TIMEOUT: {}'.format(e)
+            'message': 'OKAY: {}'.format(e)
         }
         sio.disconnect()
     except Exception as e:
         logger.error('Exception processing stream: {}'.format(e))
         result = {
-            'job_type': 'person_detection',
             'message': 'EXCEPTION: {}'.format(e)
         }
     return result
 
-def run(args, channel, logger):
-    interpreter, inference_size = helper.load_interpreter(os.path.join(args.model_dir, args.default_model), os.path.join(args.model_dir, args.default_labels))
-    job_type = args.default_job_type
-    for method_frame, _, body in channel.consume(args.input_queue):
+def run(args, channel):
+    global logger
+    interpreter, inference_size = helper.load_interpreter(os.path.join(args.model_dir, args.model), os.path.join(args.model_dir, args.labels))
+    for method_frame, _, body in channel.consume('interpreter'):
         logger.info('New RabbitMQ message: {}'.format(body))
         try:
-            job_type, interpreter, inference_size, source = load_job(args, current_job_type, interpreter, body)
-            if job_type == 'person_detection':
-                result = process_webstream(args, interpreter, inference_size, source)
-                channel.basic_publish(exchange='',
-                    routing_key=args.output_queue,
-                    body=json.dumps(result))
+            source = load_job(body)
+            result = process_webstream(args.timeout_seconds, interpreter, inference_size, source)
+            channel.basic_publish(exchange='', routing_key='notifier', body=json.dumps(result))
             channel.basic_ack(method_frame.delivery_tag)
         except pika.exceptions.ConnectionClosed as e:
             logger.error('Error notifying job complete: {}'.format(e))
             return
 
 def main():
-    parser = argparse.ArgumentParser(description="Coral TPU camera stream interpreter service")
-    parser.add_argument('--model_dir', help='.tflite model path',
-                        default='./models/')
-    parser.add_argument('--default_labels', help='label file path',
-                        default='./models/coco_labels.txt')
-    parser.add_argument('--default_model', help='label file path',
-                        default='./models/mobilenet_ssd_v2_face_quant_postprocess_edgetpu.tflite')
-    parser.add_argument('--default_job_type', help='default job type run on startup',
-                        default='person_detection')
-    parser.add_argument('--top_k', type=int, default=3,
-                        help='number of categories with highest score to display')
-    parser.add_argument('--threshold', type=float, default=0.4,
-                        help='confidence score threshold')
-    parser.add_argument('--input_queue', type=str, default="interpreter",
-                        help='input job queue for interpreter')
-    parser.add_argument('--output_queue', type=str, default="notifier",
-                        help='output job queue for interpreter')
-    parser.add_argument('--job_timeout', type=int, default=30,
-                        help='how long until job runs out of time in seconds')
-    parser.add_argument('--output_dir', type=str, default="./output",
-                        help='output desitnation for interpreter completed jobs')
-    args = parser.parse_args()
-
-    logger = load_logger(logging.DEBUG)
-
+    global logger
+    args = Variables()
+    logger = helper.load_logger(logging.DEBUG)
     if os.path.isdir(args.output_dir) == False:
         os.makedirs(args.output_dir, exist_ok = True)
-
-    try:
-        connection, channel = load_rabbitmq(args)
-        run(args, channel, logger)
-        requeued_messages = channel.cancel()
-        logger.info('Requeued %i messages' % requeued_messages)
-        connection.close()
-    except pika.exceptions.AMQPConnectionError as e:
-        logger.error('Error connecting to RabbitMQ service: {}. Exiting...'.format(e))
+    connection_attempts = 0
+    while True:
+        try:
+            connection, channel = helper.load_rabbitmq(args.rabbitmq_host, args.rabbitmq_user, args.rabbitmq_password)
+            run(args, channel)
+            requeued_messages = channel.cancel()
+            logger.info('Requeued %i messages' % requeued_messages)
+            connection.close()
+        except pika.exceptions.AMQPConnectionError as e:
+            logger.error('Error opening connecting to RabbitMQ service: ' + str(e))
+            connection_attempts += 1
+            if connection_attempts >= 5:
+                logger.error('Failed connecting to RabbitMQ service after 5 attempts. Exiting...')
+                break
+            else:
+                time.sleep(5)
+                continue
+        except pika.exceptions.AMQPChannelError as e:
+            logger.error('Error opening channel on RabbitMQ service: ' + str(e))
+            break
+        except pika.exceptions.ConnectionClosedByBroker as e:
+            logger.error('Error from connection closed by broker for RabbitMQ: ' + str(e))
+            break
 
 if __name__ == '__main__':
     main()

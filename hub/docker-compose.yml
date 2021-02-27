@@ -3,91 +3,80 @@ services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: rabbitmq
-    restart: unless-stopped
+#    restart: unless-stopped
     networks:
       - back-end
     volumes:
-      - ./rabbitmq/etc/:/etc/rabbitmq
-      - ./rabbitmq/data/:/var/lib/rabbitmq
-      - ./log/rabbitmq/:/var/log/rabbitmq
+      - ${PWD}/rabbitmq/etc:/etc/rabbitmq
+      - ${PWD}/rabbitmq/data:/var/lib/rabbitmq
     environment:
-#     - RABBITMQ_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE}
-      - RABBITMQ_DEFAULT_USER: "guest"
-      - RABBITMQ_DEFAULT_PASS: "guest"
-#    ports:
-#      - 5672:5672
-#      - 15672:15672
-  proxy:
-    build: ./proxy
-    image: jjhickman/iot-home-proxy
-    container_name: proxy
-    restart: unless-stopped
-    depends-on: api
-    networks:
-      - host
-      - back-end
-    volumes:
-      - ./proxy/nginx:/etc/nginx:ro
-    environment:
-      - API_ENDPOINT: "api:8080"
-  notifier:
-    build: ./notifier
-    image: jjhickman/iot-home-notifier
-    container_name: notifier
-    restart: unless-stopped
-    depends-on: rabbitmq
-    networks:
-      - host
-      - back-end
-    volumes:
-      - ./output:/notifier/output
-    environment:
-      - RABBITMQ_HOST: "rabbitmq"
-      - RABBITMQ_USER: "guest"
-      - RABBITMQ_PASSWORD: "guest"
-      - RABBITMQ_QUEUE: "notifier"
-      - SNS_TOPIC_ARN: "jjhickman-iot-home"
-      - S3_BUCKET: "jjhickman-iot-home"
-      - LOG_LEVEL: "debug"
-      - HUB_REST_ENDPOINT: "api:8080"
-      - AWS_DEFAULT_REGION: "us-east-1"
+      - RABBITMQ_DEFAULT_USER=test
+      - RABBITMQ_DEFAULT_PASS=test
+    ports:
+      - 5672:5672
+      - 15672:15672
   interpreter:
     build: ./interpreter
-    image: jjhickman/iot-home-interpreter
     container_name: interpreter
-    restart: unless-stopped
-    depends-on: rabbitmq
+#    restart: unless-stopped
+    privileged: true
+    depends_on: 
+      - rabbitmq
+    extra_hosts:
+      security-cam: 192.168.50.166
     networks:
-      - host
       - back-end
     volumes:
-      - ./models:/interpreter/models
-      - ./output:/interpreter/output
+      - ${PWD}/output:/interpreter/output:rw
     environment:
-      - RABBITMQ_HOST: "rabbitmq"
-      - RABBITMQ_USER: "guest"
-      - RABBITMQ_PASSWORD: "guest"
-      - INPUT_QUEUE: "input"
-      - OUTPUT_QUEUE: "output"
-      - LOG_LEVEL: "debug"
-      - TOP_K: 10
-      - THRESHOLD: 0.5
-      - JOB_TIMEOUT_SEC: 30
-  api:
-    build: ./api
-    image: jjhickman/iot-home-api
-    container_name: api
-    restart: unless-stopped
-    networks:
-      - back-end
+      - RABBITMQ_USER=test
+      - RABBITMQ_PASSWORD=test
+#  proxy:
+#    build: ./proxy
+#    image: jjhickman/iot-home:proxy
+#    container_name: proxy
+#    restart: unless-stopped
+#    depends_on: 
+#      - api
+#    networks:
+#      - host
+#      - back-end
+#    volumes:
+#      - ./proxy/nginx:/etc/nginx:ro
+#    environment:
+#      - API_ENDPOINT=api:8080
+#  notifier:
+#    build: ./notifier
+#    image: jjhickman/iot-home-notifier
+#   container_name: notifier
+#    restart: unless-stopped
+#    depends_on: 
+#      - rabbitmq
+#    networks:
+#      - host
+#      - back-end
+#    volumes:
+#      - ./output:/notifier/output
+#    environment:
+#      - SNS_TOPIC_ARN=jjhickman-iot-home
+#      - S3_BUCKET=jjhickman-iot-home
+#      - HUB_REST_ENDPOINT=api:8080
+#      - AWS_DEFAULT_REGION=us-east-1
+#  api:
+#    build: ./api
+#    image: jjhickman/iot-home-api
+#    container_name: api
+#    restart: unless-stopped
+#    networks:
+#      - back-end
 #    ports:
 #      - 8080:8080
-    environment:
-      - RABBITMQ_HOST: "rabbitmq"
-      - RABBITMQ_USER: "guest"
-      - RABBITMQ_PASSWORD: "guest"
-      - INTERPETER_QUEUE: "input"
-      - NOTIFIER_QUEUE: "output"
-      - LOG_LEVEL: "debug"
+#    environment:
+#      - RABBITMQ_HOST: "rabbitmq"
+#      - RABBITMQ_USER: "guest"
+#      - RABBITMQ_PASSWORD: "guest"
+#      - INTERPETER_QUEUE: "input"
+#      - NOTIFIER_QUEUE: "output"
+#      - LOG_LEVEL: "debug"
 networks:
   back-end:
