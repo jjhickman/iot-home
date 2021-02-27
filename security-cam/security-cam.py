@@ -73,6 +73,8 @@ def motion_found(threshold, frame):
         motion = True
   
         (x, y, w, h) = cv2.boundingRect(contour) 
+    if motion:
+        logger.debug("Motion detected!")
     return motion
 
 
@@ -91,20 +93,17 @@ async def stream(app):
             if ret == False:
                 logger.info("FAILED READING FROM CAPTURE")
                 break
-            logger.debug("NEW FRAME")
             ret, jpg_image = cv2.imencode('.jpg', frame)
             base64_image = base64.b64encode(jpg_image)
             await app['socket'].emit('image', base64_image)
 
-            logger.debug("EMITTED FRAME")
             await asyncio.sleep(refresh_seconds)
             awake = awake_time == -1 or time.time() >= awake_time
             if awake and motion_found(int(app['config'].threshold), frame):
-                sslcontext = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH, cafile=app['config'].certificate)
-                timeout = aiohttp.ClientTimeout(total=10)
+                timeout = aiohttp.ClientTimeout(total=5)
                 async with aiohttp.ClientSession(timeout=timeout) as session:
                     try:
-                        async with session.post(app['config'].hub_url, timeout=timeout, ssl=sslcontext, json={'source': stream_url, 'time': round(time.time() * 1000)}) as response:
+                        async with session.post(app['config'].hub_url, auth=aiohttp.BasicAuth(app['config'].hub_username, app['config'].hub_password,'utf-8'), timeout=timeout, json={'source': stream_url, 'time': round(time.time() * 1000)}) as response:
                             status = await response.status()
                             data = await response.json()
                             if status != 200:
@@ -116,10 +115,10 @@ async def stream(app):
                                     awake_time = time.time() + int(data['sleep_seconds'])
                                     logger.info("Sleeping for " + str(data['sleep_seconds']) + " seconds...")
                                 else:
-                                    awake_time = time.time() + int(data['sleep_seconds'])
+                                    awake_time = time.time() +  60
                                     logger.error("No sleep_seconds field in JSON response. Sleeping for default 60 seconds...")
                     except aiohttp.ClientError as e:
-                        logger.error(str(e))
+                        logger.error("HTTP Client POST error: " + str(e))
                         awake_time = time.time() + 60
         logger.debug('Ended stream!')
     except asyncio.CancelledError:

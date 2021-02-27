@@ -7,11 +7,12 @@ services:
     devices:
       - /dev/video0
       - /dev/vchiq
-#    volumes:
-#      - /opt/vc:/opt/vc
+    volumes:
+      - /opt/vc:/opt/vc
     network_mode: host
     environment:
-      - STREAM_PORT=3333
+      - LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1
       - STREAM_FPS=30
       - HUB_REST_ENDPOINT=http://192.168.50.166:8080
       - THRESHOLD=30
+      - HUB_CERTIFICATE=/etc/security-cam/ca.crt

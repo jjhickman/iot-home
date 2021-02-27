@@ -46,3 +46,11 @@ class Variables:
         self.address = os.getenv("CAM_IP_ADDRESS")
         if self.address == None:
             self.address = get_ip_address('wlan0')
+
+        self.hub_username = os.getenv("HUB_USERNAME")
+        if self.hub_username == None:
+            self.hub_username = "security-cam"
+
+        self.hub_password = os.getenv("HUB_PASSWORD")
+        if self.hub_password == None:
+            self.hub_password = "password"
