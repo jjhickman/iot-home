@@ -267,3 +267,4 @@ aws-exports.js
 **/*amplifytools.xcconfig
 
 **/*data
+**/*output

@@ -1,6 +1,7 @@
 import cv2
 import pika
 import socketio
+import aiohttp
 from async_timeout import timeout
 import asyncio
 from PIL import Image
@@ -27,46 +28,45 @@ THRESHOLD = 0.5
 async def process_webstream(timeout_seconds, inference_size, source, labels, output_dir):
     global result,sio, logger, interpreter
     result = {}
-    sio = socketio.Client()
+    sio = socketio.AsyncClient()
     try:
         async with timeout(timeout_seconds):
             @sio.event
-            def connect():
+            async def connect():
                 global logger
                 logger.debug('Connected at {}! Processing stream...'.format(datetime.datetime.now()))
 
             @sio.on('image')
-            def on_image(message):
+            async def on_image(message):
                 global result, sio, logger, TOP_K, THRESHOLD, interpreter
                 try:
                     decoded = base64.b64decode(message)
                     image = Image.open(BytesIO(decoded))
                     _, scale = common.set_resized_input(interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
-                    start = time.time()
                     interpreter.invoke()
                     objects = detect.get_objects(interpreter, THRESHOLD, scale)[:TOP_K]
                     if len(objects) > 0:
-                        logger.info('Person detected!')
+                        logger.debug('Person detected!')
                         filepath = os.path.join(output_dir, '{}.jpg'.format(datetime.datetime.now()))
                         result = {
                             'message': 'INTRUDER FOUND',
                             'file': filepath
                         }
                         image.save(filepath)
-                        sio.disconnect()
+                        await sio.disconnect()
                 except Exception as e:
                     logger.debug('Error parsing message from socketio server: {}'.format(e))
                     result = {
                         'message': 'INTERPRETER_ERROR: {}'.format(e)
                     }
-                    sio.disconnect()
-            sio.connect(source)
-            sio.wait()
+                    await sio.disconnect()
+            await sio.connect(source)
+            await sio.wait()
     except asyncio.TimeoutError as e:
         await sio.disconnect()
-        logger.debug('Disconnecting. Job expired: {}'.format(e))
+        logger.debug('Disconnecting. Job expired')
         result = {
-            'message': 'OKAY: {}'.format(e)
+            'message': 'OKAY'
         }
     except Exception as e:
         logger.error('Exception processing stream: {}'.format(e))

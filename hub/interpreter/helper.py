@@ -15,8 +15,6 @@ from pycoral.utils.edgetpu import make_interpreter
 def load_rabbitmq(rabbitmq_host, rabbitmq_user, rabbitmq_password):
     url = 'amqp://'+ rabbitmq_user + ':' + rabbitmq_password + '@' + rabbitmq_host + ':5672/%2F?blocked%5Fconnection%5Ftimeout=300&stack%5Ftimeout=300&socket%5Ftimeout=300&connection%5Fattempts=5'
     parameters = pika.URLParameters(url)
-    #credentials = pika.PlainCredentials(rabbitmq_user, rabbitmq_password)
-    #parameters = pika.ConnectionParameters(host=rabbitmq_host, credentials=credentials, blocked_connection_timeout=300, stack_timeout=300, socket_timeout=300)
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
     channel.basic_qos(prefetch_count=1) # tell RabbitMQ not to give more than one message at a time
