@@ -2,3 +2,4 @@ asyncio
 python-socketio
 async-timeout
 pika
+requests

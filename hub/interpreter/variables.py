@@ -9,7 +9,7 @@ class Variables:
         
         self.model = os.getenv('MODEL')
         if self.model == None:
-            self.model = 'mobilenet_ssd_v2_face_quant_postprocess_edgetpu.tflite'
+            self.model = 'ssd_mobilenet_v2_face_quant_postprocess_edgetpu.tflite'
 
         self.labels = os.getenv('LABELS')
         if self.labels == None:

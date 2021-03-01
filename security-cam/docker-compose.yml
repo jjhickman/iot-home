@@ -3,6 +3,7 @@ services:
   security-cam:
     build: .
     container_name: security-cam
+    hostname: security-cam
     restart: unless-stopped
     devices:
       - /dev/video0
@@ -15,4 +16,3 @@ services:
       - STREAM_FPS=30
       - HUB_REST_ENDPOINT=http://192.168.50.166:8080
       - THRESHOLD=30
-      - HUB_CERTIFICATE=/etc/security-cam/ca.crt

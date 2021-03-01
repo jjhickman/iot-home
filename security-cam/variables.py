@@ -39,10 +39,6 @@ class Variables:
         else:
             self.threshold = int(self.threshold)
 
-        self.certificate = os.getenv("HUB_CERTIFICATE")
-        if self.certificate == None:
-            self.certificate = '/run/secrets/ca.crt'
-
         self.address = os.getenv("CAM_IP_ADDRESS")
         if self.address == None:
             self.address = get_ip_address('wlan0')

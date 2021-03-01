@@ -36,17 +36,18 @@ def load_interpreter(model, labels):
     interpreter.allocate_tensors()
     labels = read_label_file(labels)
     inference_size = input_size(interpreter)
-    return interpreter, inference_size
+    return interpreter, inference_size, labels
 
 def load_job(job):
     try:
-        data = json.loads(job)
+        json_str = job.decode('utf-8').replace("'","")
+        data = json.loads(json_str)
         source = data['source']
         return source
     except ValueError as e:
-        return '', None, None, ''
+        return ''
     except KeyError as e:
-        return '', None, None, ''
+        return ''
 
 def append_objs_to_img(cv2_im, inference_size, objs, labels):
     height, width, channels = cv2_im.shape

@@ -1,40 +1,44 @@
-version: "3.9"
+version: "3.4"
 services:
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: rabbitmq
-#    restart: unless-stopped
+    hostname: rabbitmq
+    restart: always
     networks:
       - back-end
     volumes:
-      - ${PWD}/rabbitmq/etc:/etc/rabbitmq
-      - ${PWD}/rabbitmq/data:/var/lib/rabbitmq
-    environment:
-      - RABBITMQ_DEFAULT_USER=test
-      - RABBITMQ_DEFAULT_PASS=test
+      - ${PWD}/rabbitmq/etc/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - ${PWD}/rabbitmq/etc/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ${PWD}/rabbitmq/data:/var/lib/rabbitmq:rw
+      - ${PWD}/rabbitmq/logs:/var/log/rabbitmq/log:rw
     ports:
       - 5672:5672
       - 15672:15672
   interpreter:
     build: ./interpreter
     container_name: interpreter
+    hostname: interpreter
 #    restart: unless-stopped
-    privileged: true
+    devices:
+      - /dev/bus/usb
     depends_on: 
       - rabbitmq
     extra_hosts:
-      security-cam: 192.168.50.166
+      security-cam: 192.168.50.154
     networks:
       - back-end
     volumes:
       - ${PWD}/output:/interpreter/output:rw
     environment:
-      - RABBITMQ_USER=test
-      - RABBITMQ_PASSWORD=test
+      - LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1
+      - RABBITMQ_USER=interpreter
+      - RABBITMQ_PASSWORD=interpreter
 #  proxy:
 #    build: ./proxy
 #    image: jjhickman/iot-home:proxy
 #    container_name: proxy
+#    hostname: proxy
 #    restart: unless-stopped
 #    depends_on: 
 #      - api
@@ -48,7 +52,8 @@ services:
 #  notifier:
 #    build: ./notifier
 #    image: jjhickman/iot-home-notifier
-#   container_name: notifier
+#    container_name: notifier
+#    hostname: notifier
 #    restart: unless-stopped
 #    depends_on: 
 #      - rabbitmq
@@ -66,6 +71,7 @@ services:
 #    build: ./api
 #    image: jjhickman/iot-home-api
 #    container_name: api
+#    hostname: api
 #    restart: unless-stopped
 #    networks:
 #      - back-end

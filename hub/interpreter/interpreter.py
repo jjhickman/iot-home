@@ -1,9 +1,9 @@
 import cv2
 import pika
 import socketio
-import async_timeout
+from async_timeout import timeout
 import asyncio
-#from PIL import Image
+from PIL import Image
 from io import BytesIO
 import base64
 import os
@@ -12,67 +12,62 @@ import datetime
 import time
 import helper
 import logging
+import requests
 from variables import Variables
-from pycoral.adapters.detect import get_objects
-from pycoral.utils.edgetpu import run_inference
+from pycoral.adapters import common
+from pycoral.adapters import detect
 
 sio = None
 result = {}
 logger = None
-
+interpreter = None
 TOP_K = 5
 THRESHOLD = 0.5
 
-def process_webstream(timeout_seconds, interpreter, inference_size, source):
-    global result,sio, logger
+async def process_webstream(timeout_seconds, inference_size, source, labels, output_dir):
+    global result,sio, logger, interpreter
     result = {}
     sio = socketio.Client()
     try:
-        with async_timeout(timeout_seconds):
+        async with timeout(timeout_seconds):
             @sio.event
-            async def connect():
+            def connect():
                 global logger
                 logger.debug('Connected at {}! Processing stream...'.format(datetime.datetime.now()))
-    
-            @sio.event
-            async def connect_error():
-                global logger
-                logger.error("The connection failed!")
 
             @sio.on('image')
-            async def on_image(message):
-                global result, sio, logger, TOP_K, THRESHOLD
+            def on_image(message):
+                global result, sio, logger, TOP_K, THRESHOLD, interpreter
                 try:
-                    #image = Image.open(BytesIO(base64.b64decode(message['data'])))
-                    image = BytesIO(base64.b64decode(message['data']))
+                    decoded = base64.b64decode(message)
+                    image = Image.open(BytesIO(decoded))
+                    _, scale = common.set_resized_input(interpreter, image.size, lambda size: image.resize(size, Image.ANTIALIAS))
                     start = time.time()
-                    run_inference(interpreter, image)
-                    logger.debug('Interpreted image in {} ms'.format(1000*(time.time() - start)))
-                    objects = get_objects(interpreter, THRESHOLD)[:TOP_K]
-                    image = helper.append_objs_to_img(cv2_im, inference_size, objs, labels)
+                    interpreter.invoke()
+                    objects = detect.get_objects(interpreter, THRESHOLD, scale)[:TOP_K]
                     if len(objects) > 0:
                         logger.info('Person detected!')
-                        filepath = os.path.join(args.output_dir, '{}.jpg'.format(datetime.datetime.now()))
+                        filepath = os.path.join(output_dir, '{}.jpg'.format(datetime.datetime.now()))
                         result = {
                             'message': 'INTRUDER FOUND',
                             'file': filepath
                         }
-                        await image.save(filepath)
-                        await sio.disconnect()
+                        image.save(filepath)
+                        sio.disconnect()
                 except Exception as e:
                     logger.debug('Error parsing message from socketio server: {}'.format(e))
                     result = {
                         'message': 'INTERPRETER_ERROR: {}'.format(e)
                     }
-                    await sio.disconnect()
-            logger.debug('Connecting to {} at {}'.format(source, time.time()))
+                    sio.disconnect()
             sio.connect(source)
+            sio.wait()
     except asyncio.TimeoutError as e:
+        await sio.disconnect()
         logger.debug('Disconnecting. Job expired: {}'.format(e))
         result = {
             'message': 'OKAY: {}'.format(e)
         }
-        sio.disconnect()
     except Exception as e:
         logger.error('Exception processing stream: {}'.format(e))
         result = {
@@ -81,15 +76,17 @@ def process_webstream(timeout_seconds, interpreter, inference_size, source):
     return result
 
 def run(args, channel):
-    global logger
-    interpreter, inference_size = helper.load_interpreter(os.path.join(args.model_dir, args.model), os.path.join(args.model_dir, args.labels))
+    global logger, interpreter
+    interpreter, inference_size, labels = helper.load_interpreter(os.path.join(args.model_dir, args.model), os.path.join(args.model_dir, args.labels))
     for method_frame, _, body in channel.consume('interpreter'):
         logger.info('New RabbitMQ message: {}'.format(body))
         try:
-            source = load_job(body)
-            result = process_webstream(args.timeout_seconds, interpreter, inference_size, source)
+            source = helper.load_job(body)
+            loop = asyncio.get_event_loop()
+            result = loop.run_until_complete(asyncio.gather(process_webstream(args.timeout_seconds, inference_size, source, labels, args.output_dir)))
             channel.basic_publish(exchange='', routing_key='notifier', body=json.dumps(result))
             channel.basic_ack(method_frame.delivery_tag)
+            logger.info('Published to notifier: ' + str(json.dumps(result)))
         except pika.exceptions.ConnectionClosed as e:
             logger.error('Error notifying job complete: {}'.format(e))
             return
@@ -104,6 +101,8 @@ def main():
     while True:
         try:
             connection, channel = helper.load_rabbitmq(args.rabbitmq_host, args.rabbitmq_user, args.rabbitmq_password)
+            channel.queue_declare('interpeter', durable=True, exclusive=False, auto_delete=False)
+            channel.queue_declare('notifier', durable=True, exclusive=False, auto_delete=False)
             run(args, channel)
             requeued_messages = channel.cancel()
             logger.info('Requeued %i messages' % requeued_messages)

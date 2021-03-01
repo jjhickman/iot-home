@@ -266,4 +266,4 @@ aws-exports.js
 **/*amplify-gradle-config.json
 **/*amplifytools.xcconfig
 
-**/*rabbitmq
+**/*data
