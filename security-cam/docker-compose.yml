@@ -15,4 +15,4 @@ services:
       - LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1
       - STREAM_FPS=30
       - HUB_REST_ENDPOINT=http://192.168.50.166:8080
-      - THRESHOLD=30
+      - THRESHOLD=100

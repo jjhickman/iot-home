@@ -2,3 +2,4 @@ python-socketio==5.0.4
 aiohttp
 async-timeout
 asyncio
+scikit-image
